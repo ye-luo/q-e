@@ -25,6 +25,9 @@ clib.a : $(OBJS)
 	$(AR) $(ARFLAGS) $@ $?
 	$(RANLIB) $@
 
+esh5_interfaces.o : esh5_interfaces.c
+	$(CC) -std=c99 $(CFLAGS) -c $<
+
 source :
 	co -l $(OBJS:.o=.c)
 
