@@ -70,9 +70,9 @@ PROGRAM pw2qmcpack
   CALL mp_bcast(expand_kp, ionode_id, world_comm ) 
   CALL mp_bcast(debug, ionode_id, world_comm ) 
   !
-  CALL start_clock ( 'read_file_lite' )
+  CALL start_clock ( 'read_file' )
   CALL read_file
-  CALL stop_clock ( 'read_file_lite' )
+  CALL stop_clock ( 'read_file' )
   IF ( ( nproc /= nproc_file .or. nproc_pool /= nproc_pool_file) .and. .not. twfcollect)  &
     CALL errore('pw2qmcpack', 'pw.x run with different numbers of procs and pools. &
                              & Rerun pw2qmcpack.x with the same procs and pools as pw.x. &
