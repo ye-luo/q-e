@@ -116,6 +116,39 @@ PROGRAM pw2qmcpack
 
 END PROGRAM pw2qmcpack
 
+SUBROUTINE check_norm(ng, eigvec, collect_intra_pool, jks, ibnd, tag)
+  USE mp_pools, ONLY: me_pool, intra_pool_comm
+  USE mp,       ONLY: mp_sum
+  USE KINDS,    ONLY: DP
+  !
+  IMPLICIT NONE
+  !
+  COMPLEX(DP), INTENT(IN) :: eigvec(ng)
+  INTEGER, INTENT(IN) :: ng, jks, ibnd
+  LOGICAL, INTENT(IN) :: collect_intra_pool
+  CHARACTER(len=*), INTENT(IN) :: tag
+  !
+  INTEGER :: ig
+  REAL(DP) :: total_norm
+  !
+  ! check normalization before writing h5
+  total_norm = 0.d0
+  !$omp parallel do reduction(+:total_norm)
+  DO ig=1, ng
+    total_norm = total_norm + eigvec(ig)*CONJG(eigvec(ig))
+  ENDDO
+  ! collect within a pool
+  IF(collect_intra_pool) CALL mp_sum ( total_norm , intra_pool_comm )
+  ! compute the norm
+  total_norm = SQRT(total_norm)
+  ! check abort if necessary
+  IF (me_pool==0 .AND. ABS(total_norm-1.d0)>1.d-6) THEN
+    WRITE(*,"(A,I3,A,I3,3A,F20.15)") "The wrong norm of k-point ", jks, " band ", ibnd, " , ", &
+                                      tag, ", is ", total_norm
+    STOP
+  ENDIF
+  !
+END SUBROUTINE
 
 SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
 
@@ -191,7 +224,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   CHARACTER(iotk_attlenx) :: attr
   
   INTEGER :: rest, nbase, basekindex, nktot
-  real (dp) :: xk_cryst(3)
+  REAL(DP) :: xk_cryst(3)
 
   INTEGER :: npwx_tot, igk_g;
   
@@ -874,10 +907,14 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
     DO ibnd = 1, nbnd
       eigpacked(:)=(0.d0,0.d0)
       eigpacked(igtomin(ig_l2g(igk_k(1:npw,ik))))=evc(1:npw,ibnd)
-      if(debug) write(6,"(A,1I5)") "     collecting band ", ibnd
+      IF (debug) CALL check_norm(npw, evc(1,ibnd), .true., jks, ibnd, "before collection")
+      if (debug) write(6,"(A,1I5)") "     collecting band ", ibnd
       CALL mp_sum ( eigpacked , intra_pool_comm )
-      if(debug) write(6,"(A,1I5)") "        writing band ", ibnd
-      if(pool_ionode) CALL esh5_write_psi_g(ibnd,eigpacked,ngtot)
+      if (debug) write(6,"(A,1I5)") "        writing band ", ibnd
+      if (pool_ionode) THEN
+        CALL check_norm(ngtot, eigpacked, .false., jks, ibnd, "after collection before writing")
+        CALL esh5_write_psi_g(ibnd,eigpacked,ngtot)
+      ENDIF
     enddo
     if(pool_ionode) CALL esh5_close_spin()
     if(pool_ionode) CALL esh5_close_kpoint() 
@@ -1001,11 +1038,15 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
              !tmp_evc(:) = evc(:,ibnd)
              eigpacked(:)=(0.d0,0.d0)
              eigpacked(igtomin(ig_l2g(igk_k(1:npw,ik))))=evc(1:npw,ibnd)
+             IF (debug) CALL check_norm(npw, evc(1,ibnd), .true., jks, ibnd, "before collection")
              !
            ENDIF ! expandkp
 
            CALL mp_sum ( eigpacked , intra_pool_comm )
-           if(pool_ionode) CALL esh5_write_psi_g(ibnd,eigpacked,ngtot)
+           if (pool_ionode) THEN
+             CALL check_norm(ngtot, eigpacked, .false., jks, ibnd, "after collection before writing")
+             CALL esh5_write_psi_g(ibnd,eigpacked,ngtot)
+           ENDIF
 
            IF (write_psir) THEN
               psic(:)=(0.d0,0.d0)
