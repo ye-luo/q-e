@@ -145,6 +145,14 @@ SUBROUTINE check_norm(ng, eigvec, collect_intra_pool, jks, ibnd, tag)
   IF (me_pool==0 .AND. ABS(total_norm-1.d0)>1.d-6) THEN
     WRITE(*,"(A,I3,A,I3,3A,F20.15)") "The wrong norm of k-point ", jks, " band ", ibnd, " , ", &
                                       tag, ", is ", total_norm
+    IF (.NOT. collect_intra_pool) THEN
+      WRITE(*,"(3A)") "The orbitals went wrong before being written to h5 file. ", &
+                      "Please first add debug=.true. in the pw2qmcpack input file to check ", &
+                      "if the orbitals can be read from QE files correctly."
+    ELSE
+      WRITE(*,"(2A)") "The orbitals read from QE files are incorrect. ", &
+                      "Perhaps your QE orbital files are corrupted."
+    ENDIF
     STOP
   ENDIF
   !
