@@ -166,7 +166,6 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   USE constants, ONLY: tpi
   USE run_info,  ONLY: title
   USE gvect, ONLY: ngm, ngm_g, g, ig_l2g
-  USE gvecs, ONLY : nls, nlsm
   USE klist , ONLY: nks, nelec, nelup, neldw, wk, xk, nkstot
   USE lsda_mod, ONLY: lsda, nspin, isk
   USE scf, ONLY: rho, rho_core, rhog_core, vnew
@@ -771,7 +770,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
     DO ik = 1, nktot
       !! evaluate the phase
       !phase(:) = (0.d0,0.d0)
-      !if ( ig_(ik,ib)>0) phase( nls(ig_(ik,ib)) ) = (1.d0,0.d0)
+      !if ( ig_(ik,ib)>0) phase( dffts%nl(ig_(ik,ib)) ) = (1.d0,0.d0)
       g_red(1)=at(1,1)*xk_full_list(1,ik)+at(2,1)*xk_full_list(2,ik)+at(3,1)*xk_full_list(3,ik)
       g_red(2)=at(1,2)*xk_full_list(1,ik)+at(2,2)*xk_full_list(2,ik)+at(3,2)*xk_full_list(3,ik)
       g_red(3)=at(1,3)*xk_full_list(1,ik)+at(2,3)*xk_full_list(2,ik)+at(3,3)*xk_full_list(3,ik)
@@ -977,7 +976,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
              tmp_evc(:) = (0.d0,0.d0) 
              IF(nproc_pool > 1) THEN
                ! 
-               psic(nls(ig_l2g(igk_k(1:npw,ik))))=evc(1:npw,ibnd)
+               psic(dffts%nl(ig_l2g(igk_k(1:npw,ik))))=evc(1:npw,ibnd)
                
 !                call errore ('pw2qmcpack','parallel version not fully implemented.',2)
                if(gamma_only) then
@@ -997,11 +996,11 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
                ! 
                CALL fwfft ('Wave', psic, dffts)
                !
-               tmp_evc(1:npw_sym)=psic(nls(ig_l2g(igk_sym(1:npw_sym))))
+               tmp_evc(1:npw_sym)=psic(dffts%nl(ig_l2g(igk_sym(1:npw_sym))))
                ! 
              ELSE ! nproc_pool <= 1
                ! 
-               psic(nls(ig_l2g(igk_k(1:npw,ik))))=evc(1:npw,ibnd)
+               psic(dffts%nl(ig_l2g(igk_k(1:npw,ik))))=evc(1:npw,ibnd)
                if(gamma_only) then
                       call errore ('pw2qmcpack','problems with gamma_only, not fully implemented.',2)
                endif
@@ -1018,7 +1017,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
                !
                CALL fwfft ('Wave', psitr, dffts)
                !
-               tmp_evc(1:npw_sym)=psitr(nls(ig_l2g(igk_sym(1:npw_sym))))
+               tmp_evc(1:npw_sym)=psitr(dffts%nl(ig_l2g(igk_sym(1:npw_sym))))
                ! 
              ENDIF ! nprocpool 
 
@@ -1058,8 +1057,8 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
 
            IF (write_psir) THEN
               psic(:)=(0.d0,0.d0)
-              psic(nls(ig_l2g(igk_sym(1:npw_sym))))=tmp_evc(1:npw_sym)
-              if(gamma_only) psic(nlsm(ig_l2g(igk_sym(1:npw_sym)))) = CONJG(tmp_evc(1:npw_sym))
+              psic(dffts%nl(ig_l2g(igk_sym(1:npw_sym))))=tmp_evc(1:npw_sym)
+              if(gamma_only) psic(dffts%nlm(ig_l2g(igk_sym(1:npw_sym)))) = CONJG(tmp_evc(1:npw_sym))
               !
               CALL invfft ('Wave', psic, dffts)
               !
