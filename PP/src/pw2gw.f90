@@ -139,7 +139,7 @@ SUBROUTINE compute_gw( omegamin, omegamax, d_omega, use_gmaps, qplda, vkb, vxcdi
   USE wvfct,     ONLY : npwx, nbnd, wg, et
   USE gvecw,     ONLY : gcutw
   USE control_flags, ONLY : gamma_only
-  USE gvect,         ONLY : ngm, g, gg, ig_l2g, nl
+  USE gvect,         ONLY : ngm, g, gg, ig_l2g
   USE fft_base,  ONLY: dfftp
   USE fft_interfaces, ONLY : fwfft, invfft
   USE klist ,        ONLY : nks, xk, wk, ngk, igk_k
@@ -797,10 +797,10 @@ SUBROUTINE compute_gw( omegamin, omegamax, d_omega, use_gmaps, qplda, vkb, vxcdi
         DO iband1 = 1, nbnd
            psic(:) = (0.d0, 0.d0)
            DO ig = 1, npw
-              psic(nl(igk_k(ig,ik)))  = evc(ig,iband1)
+              psic(dfftp%nl(igk_k(ig,ik)))  = evc(ig,iband1)
            ENDDO
 
-           CALL invfft ('Dense', psic, dfftp)
+           CALL invfft ('Rho', psic, dfftp)
            vxcdiag = 0.0d0
            !norma = 0.0d0
            DO ir = 1, dfftp%nnr
@@ -1113,13 +1113,13 @@ SUBROUTINE diropn_gw (unit, filename, recl, exst, mpime, nd_nmbr_ )
   CHARACTER(len=256) :: tempfile
   ! complete file name
   CHARACTER(len=80) :: assstr
-  INTEGER :: ios, unf_recl, ierr
+  INTEGER :: ios, unf_recl, ierr, direct_io_factor
   ! used to check I/O operations
   ! length of the record
   ! error code
   LOGICAL :: opnd
   ! if true the file is already opened
-
+  REAL(dp):: dummy
 
   IF (unit < 0) CALL errore ('diropn', 'wrong unit', 1)
   !
@@ -1139,8 +1139,8 @@ SUBROUTINE diropn_gw (unit, filename, recl, exst, mpime, nd_nmbr_ )
   !
   !      the unit for record length is unfortunately machine-dependent
   !
-#define DIRECT_IO_FACTOR 8
-  unf_recl = DIRECT_IO_FACTOR * recl
+  INQUIRE (IOLENGTH=direct_io_factor) dummy
+  unf_recl = direct_io_factor * recl
   IF (unf_recl <= 0) CALL errore ('diropn', 'wrong record length', 3)
   !
   OPEN ( unit, file = trim(tempfile), iostat = ios, form = 'unformatted', &

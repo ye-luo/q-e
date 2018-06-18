@@ -25,9 +25,8 @@
 ! SP: iverbosity cannot be tested here. Generates Tb of data ...  
 !  USE control_flags, ONLY : iverbosity 
   USE io_global,     ONLY : meta_ionode
-  USE mp_global,     ONLY : inter_pool_comm
   USE mp,            ONLY : mp_barrier
-  USE mp_world,      ONLY : mpime, world_comm
+  USE mp_world,      ONLY : world_comm
   USE elph2,         ONLY : xkq
   implicit none
   !
@@ -423,8 +422,7 @@
   USE io_global,     ONLY : stdout, meta_ionode
   USE io_files,      ONLY : prefix
   USE gvecs,         ONLY : ngms, gcutms, ngms_g
-  USE gvect,         ONLY : gg, ngm, ngm_g, gcutm,&
-                            ig_l2g ,nl
+  USE gvect,         ONLY : gg, ngm, ngm_g, gcutm,ig_l2g
   USE control_flags, ONLY : gamma_only
   USE constants,     ONLY : eps8
   USE fft_base,      ONLY : dfftp
@@ -434,7 +432,6 @@
 #endif
   USE mp_global,     ONLY : inter_pool_comm, inter_image_comm
   USE mp,            ONLY : mp_barrier
-  USE mp_world,      ONLY : mpime, world_comm
   !
   IMPLICIT NONE
   !
@@ -466,7 +463,6 @@
   INTEGER :: nl_2(ngm)
   INTEGER :: m1,m2,mc
   ! 
-  !IF (mpime==0) THEN
   IF (meta_ionode) THEN
     eps = 1.d-5
     !
@@ -608,7 +604,7 @@ CALL mp_barrier(inter_image_comm)
 
 
 !gg(:) =gcutm +1.d0
-nl_2(:)=nl(:)
+nl_2(:)=dfftp%nl(:)
 gg_2(:)=gg(:)
 gg_2(:) = gcutm + 1.d0
 

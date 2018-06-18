@@ -220,10 +220,11 @@ MODULE read_namelists_module
        ! ... EXX
        !
        ace=.TRUE.
+       n_proj = 0    
        localization_thr = 0.0_dp
        scdm=.FALSE.
-       scdmden=0.10d0
-       scdmgrd=0.20d0
+       scdmden=1.0d0
+       scdmgrd=1.0d0
        !
        ! ... electric fields
        !
@@ -279,8 +280,8 @@ MODULE read_namelists_module
        ts_vdw_isolated = .FALSE.
        ts_vdw_econv_thr = 1.E-6_DP
        xdm = .FALSE.
-       xdm_a1 = 0.6836_DP
-       xdm_a2 = 1.5045_DP
+       xdm_a1 = 0.0_DP
+       xdm_a2 = 0.0_DP
        !
        ! ... ESM
        !
@@ -805,6 +806,7 @@ MODULE read_namelists_module
        CALL mp_bcast( scdm,                ionode_id, intra_image_comm )
        CALL mp_bcast( scdmden,             ionode_id, intra_image_comm )
        CALL mp_bcast( scdmgrd,             ionode_id, intra_image_comm )
+       CALL mp_bcast( n_proj,              ionode_id, intra_image_comm )
        CALL mp_bcast( nqx1,                   ionode_id, intra_image_comm )
        CALL mp_bcast( nqx2,                   ionode_id, intra_image_comm )
        CALL mp_bcast( nqx3,                   ionode_id, intra_image_comm )
@@ -1982,21 +1984,28 @@ MODULE read_namelists_module
        INTEGER,INTENT(in) :: ios, unit_loc
        CHARACTER(LEN=*) :: nl_name
        CHARACTER(len=512) :: line
+       INTEGER :: ios2
        !
        IF( ionode ) THEN
-         !READ( unit_loc, control, iostat = ios )
+         ios2=0
          IF (ios /=0) THEN
            BACKSPACE(unit_loc)
-           READ(unit_loc,'(A512)') line
-          END IF
+           READ(unit_loc,'(A512)', iostat=ios2) line
+         END IF
        END IF
+
+       CALL mp_bcast( ios2, ionode_id, intra_image_comm )
+       IF( ios2 /= 0 ) THEN
+          CALL errore( ' read_namelists ', ' could not find namelist &'//TRIM(nl_name), 2)
+       ENDIF
+       !
        CALL mp_bcast( ios, ionode_id, intra_image_comm )
        CALL mp_bcast( line, ionode_id, intra_image_comm )
        IF( ios /= 0 ) THEN
           CALL errore( ' read_namelists ', &
                        ' bad line in namelist &'//TRIM(nl_name)//&
                        ': "'//TRIM(line)//'" (error could be in the previous line)',&
-                       ABS(ios) )
+                       1 )
        END IF
        !
      END SUBROUTINE check_namelist_read
