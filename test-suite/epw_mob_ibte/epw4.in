@@ -24,8 +24,8 @@
   vme         = .false.
 
   scissor     =  0.7
-  nstemp      =   3
-  tempsmin    = 300
+  nstemp      =   2
+  tempsmin    = 400
   tempsmax    = 500
 
   restart     = .false.
@@ -65,19 +65,19 @@
   phonselfen  = .false.
   a2f         = .false.
 
-  fsthick     = 3.0
+  fsthick     = 4.0
   eptemp      = 1 ! K 
-  degaussw    = 0.05 ! eV
+  degaussw    = 0.1 ! eV
 
   dvscf_dir   = './save/'
   
-  nkf1        = 6
-  nkf2        = 6
-  nkf3        = 6
+  nkf1        = 7
+  nkf2        = 7
+  nkf3        = 7
 
-  nqf1        = 6
-  nqf2        = 6
-  nqf3        = 6
+  nqf1        = 7
+  nqf2        = 7
+  nqf3        = 7
 
   nk1         = 6
   nk2         = 6
