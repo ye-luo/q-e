@@ -478,11 +478,17 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
 
   CALL iotk_write_attr (attr,"name",TRIM(atm(na)),first=.true.)
   CALL iotk_write_begin(iun, "group",ATTR=attr)
+  ! charge
   CALL iotk_write_attr (attr,"name","charge",first=.true.)
   CALL iotk_write_begin(iun, "parameter",ATTR=attr)
-  write(iun,*) zv(na)
+  write(iun,"(8X, F3.1)") zv(na)
   CALL iotk_write_end(iun, "parameter")
-
+  ! atomic number
+  CALL iotk_write_attr (attr,"name","atomicnumber",first=.true.)
+  CALL iotk_write_begin(iun, "parameter",ATTR=attr)
+  write(iun,"(8X, I3)") atomic_number(TRIM(atm(na)))
+  CALL iotk_write_end(iun, "parameter")
+  !
   CALL iotk_write_end(iun, "group")
   ENDDO
 
