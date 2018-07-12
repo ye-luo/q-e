@@ -106,6 +106,7 @@ PROGRAM pw2qmcpack
     CALL print_clock ( 'glue_h5' )
   ENDIF
 #else
+#error HDF5 flag neither enabled during configure nor added manually in make.inc
   CALL errore('pw2qmcpack', ' HDF5 flag not enabled during configure',1)
 #endif
   CALL environment_end ( 'pw2qmcpack' )
