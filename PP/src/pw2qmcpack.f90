@@ -73,10 +73,6 @@ PROGRAM pw2qmcpack
   CALL start_clock ( 'read_file' )
   CALL read_file
   CALL stop_clock ( 'read_file' )
-  IF ( ( nproc /= nproc_file .or. nproc_pool /= nproc_pool_file) )  &
-    CALL errore('pw2qmcpack', 'pw.x run with different numbers of procs and pools. &
-                             & Rerun pw2qmcpack.x with the same procs and pools as pw.x. &
-                             & Or use wf_collect=.true. in pw.x input file.',1)
   IF ( gamma_only ) &
     CALL errore('pw2qmcpack', 'Using gamma trick results a reduced G space that is not supported by QMCPACK &
                              & though pw2qmcpack itself still can convert the WF to an h5 file in this case (experts only). &
