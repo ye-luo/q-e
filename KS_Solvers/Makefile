@@ -25,6 +25,9 @@ CG/rotate_wfc_k.o \
 PPCG/ppcg_param.o \
 PPCG/ppcg_gamma.o \
 PPCG/ppcg_k.o
+
+-include make.gpu 
+
 # add here other objects, e.g. ParO/*.o NewSolver/*.o
 
 libks_solvers.a: $(ALLOBJS)

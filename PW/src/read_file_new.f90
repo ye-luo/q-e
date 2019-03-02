@@ -32,6 +32,9 @@ SUBROUTINE read_file()
   USE gvect,                ONLY : ngm, g
   USE gvecw,                ONLY : gcutw
   USE qes_types_module,     ONLY : output_type
+  !
+  USE uspp_gpum,            ONLY : using_becsum
+  !
   IMPLICIT NONE 
   TYPE ( output_type) :: output_obj 
   INTEGER :: ierr
@@ -75,6 +78,7 @@ SUBROUTINE read_file()
   IF (lda_plus_u .AND. (U_projection == 'pseudo')) CALL init_q_aeps()
   !
   IF (okpaw) THEN
+     CALL using_becsum(2)
      becsum = rho%bec
      CALL PAW_potential(rho%bec, ddd_PAW)
   ENDIF 
@@ -147,6 +151,12 @@ SUBROUTINE read_xml_file ( wfc_is_collected )
   USE qes_bcast_module       ONLY : qes_bcast
   USE mp_images,             ONLY : intra_image_comm
 #endif
+  !
+  USE wvfct_gpum,            ONLY : using_et, using_wg, using_wg_d
+  USE gvect_gpum,            ONLY : using_g, using_gg, using_g_d, using_gg_d, &
+                                    using_mill, using_mill_d, &
+                                    using_eigts1, using_eigts2, using_eigts3, &
+                                    using_eigts1_d, using_eigts2_d, using_eigts3_d
   !
   IMPLICIT NONE
   LOGICAL, INTENT(OUT) :: wfc_is_collected
@@ -234,6 +244,7 @@ SUBROUTINE read_xml_file ( wfc_is_collected )
   !
   nbndx = nbnd
   ALLOCATE( et( nbnd, nkstot ) , wg( nbnd, nkstot ) )
+  CALL using_et(1); CALL using_wg(1)
   !
   ! ... here we read all the variables defining the system
   !
@@ -245,8 +256,14 @@ SUBROUTINE read_xml_file ( wfc_is_collected )
   !
   CALL divide_et_impera( nkstot, xk, wk, isk, nks )
   !
+  CALL using_et(1)
   CALL poolscatter( nbnd, nkstot, et, nks, et )
+  CALL using_wg(1)
   CALL poolscatter( nbnd, nkstot, wg, nks, wg )
+#if defined(__CUDA)
+  ! Updating wg here. Should not be done and will be removed ASAP.
+  CALL using_wg_d(0)
+#endif
   !
   ! ... check on symmetry
   !
@@ -293,6 +310,15 @@ SUBROUTINE read_xml_file ( wfc_is_collected )
   CALL ggen ( dfftp, gamma_only, at, bg, gcutm, ngm_g, ngm, &
        g, gg, mill, ig_l2g, gstart ) 
   CALL ggens( dffts, gamma_only, at, g, gg, mill, gcutms, ngms ) 
+
+  ! All these variables are actually set by ggen which has intent out
+#if defined(__CUDA)
+  !
+  CALL using_mill(2); CALL using_mill_d(0); ! updates mill indices,
+  CALL using_g(2);    CALL using_g_d(0);    ! g and gg that are used almost only after
+  CALL using_gg(2);   CALL using_gg_d(0)    ! a single initialization .
+                                            ! This is a trick to avoid checking for sync everywhere.
+#endif
   IF (do_comp_esm) THEN
      CALL init_vars_from_schema ( 'esm', ierr, output_obj, parinfo_obj, geninfo_obj ) 
      CALL esm_init()
@@ -333,6 +359,11 @@ SUBROUTINE read_xml_file ( wfc_is_collected )
   CALL init_vloc()
   CALL struc_fact( nat, tau, nsp, ityp, ngm, g, bg, dfftp%nr1, dfftp%nr2, &
                    dfftp%nr3, strf, eigts1, eigts2, eigts3 )
+#if defined(__CUDA)
+  CALL using_eigts1(2);   CALL using_eigts2(2);   CALL using_eigts3(2);
+  CALL using_eigts1_d(0); CALL using_eigts2_d(0); CALL using_eigts3_d(0);
+#endif
+  !
   CALL setlocal()
   CALL set_rhoc()
   !

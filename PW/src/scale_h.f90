@@ -29,6 +29,9 @@ subroutine scale_h
   USE mp,         ONLY : mp_max
   USE mp_bands,   ONLY : intra_bgrp_comm
   !
+  USE gvect_gpum, ONLY : using_g, using_g_d, using_gg, using_gg_d
+  USE us_gpum,    ONLY : using_tab, using_tab_at, using_qrad
+  !
   implicit none
   !
   integer :: ig
@@ -70,6 +73,12 @@ subroutine scale_h
      gg_max = max(gg(ig), gg_max)
   enddo
 
+  CALL using_g(1); CALL using_gg(1)       ! g and gg are used almost only after
+#if defined(__CUDA)
+  ! the preprocessor directive is needed to avoid touching duplicated data in CPU only sompilations
+  CALL using_g_d(0); CALL using_gg_d(0) ! This is a trick to avoid checking for sync everywhere.
+  !
+#endif
   CALL mp_max (gg_max, intra_bgrp_comm)
 
   if(nqxq < int(sqrt(gg_max)/dq)+4) then
@@ -78,6 +87,8 @@ subroutine scale_h
   endif
   !
   ! scale the non-local pseudopotential tables
+  !
+  CALL using_tab(1); CALL using_tab_at(1); CALL using_qrad(1)
   !
   tab(:,:,:) = tab(:,:,:) * sqrt (omega_old/omega)
   qrad(:,:,:,:) = qrad(:,:,:,:) * omega_old/omega

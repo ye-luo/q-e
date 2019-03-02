@@ -29,6 +29,9 @@ SUBROUTINE orthoUwfc
                          bec_type, becp, calbec
   USE control_flags,    ONLY : gamma_only
   USE noncollin_module, ONLY : noncolin, npol
+  !
+  USE uspp_gpum,        ONLY : using_vkb
+  USE becmod_subs_gpum, ONLY : using_becp_auto
   ! 
   IMPLICIT NONE
   !
@@ -78,6 +81,7 @@ SUBROUTINE orthoUwfc
 
   ! Allocate the array becp = <beta|wfcatom>
   CALL allocate_bec_type (nkb,natomwfc, becp) 
+  CALL using_becp_auto(2)
   
   DO ik = 1, nks
      
@@ -87,6 +91,7 @@ SUBROUTINE orthoUwfc
        CALL atomic_wfc (ik, wfcatom)
      ENDIF
      npw = ngk (ik)
+     CALL using_vkb(1)
      CALL init_us_2 (npw, igk_k(1,ik), xk (1, ik), vkb)
      CALL calbec (npw, vkb, wfcatom, becp) 
      CALL s_psi (npwx, npw, natomwfc, wfcatom, swfcatom)
@@ -104,6 +109,7 @@ SUBROUTINE orthoUwfc
   ENDDO
   DEALLOCATE (wfcatom, swfcatom)
   CALL deallocate_bec_type ( becp )
+  CALL using_becp_auto(2)
   !
   RETURN
      
@@ -131,6 +137,8 @@ SUBROUTINE orthoatwfc (orthogonalize_wfc)
                          bec_type, becp, calbec
   USE control_flags,    ONLY : gamma_only
   USE noncollin_module, ONLY : noncolin, npol
+  !
+  USE uspp_gpum, ONLY : using_vkb
   ! 
   IMPLICIT NONE
   !
@@ -157,6 +165,7 @@ SUBROUTINE orthoatwfc (orthogonalize_wfc)
        CALL atomic_wfc (ik, wfcatom)
      ENDIF
      npw = ngk (ik)
+     CALL using_vkb(1)
      CALL init_us_2 (npw, igk_k(1,ik), xk (1, ik), vkb)
      CALL calbec (npw, vkb, wfcatom, becp) 
      CALL s_psi (npwx, npw, natomwfc, wfcatom, swfcatom)

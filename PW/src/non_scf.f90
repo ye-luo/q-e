@@ -25,12 +25,16 @@
   USE wvfct,                ONLY : nbnd, et, npwx
   USE wavefunctions, ONLY : evc
   !
+  USE wavefunctions_gpum, ONLY : using_evc
+  USE wvfct_gpum,                ONLY : using_et
+  !
   IMPLICIT NONE
   !
   ! ... local variables
   !
   INTEGER :: iter, i
   REAL(DP), EXTERNAL :: get_clock
+  CALL using_evc(0) ! This may not be needed. save buffer is intent(in)
   !
   !
   CALL start_clock( 'electrons' )
@@ -62,6 +66,7 @@
   ! ... explicitly collected to the first node
   ! ... this is done here for et, in weights () for wg
   !
+  CALL using_et(1)
   CALL poolrecover( et, nbnd, nkstot, nks )
   !
   ! ... calculate weights of Kohn-Sham orbitals (only weights, not Ef,
@@ -91,6 +96,8 @@
   ! ... save converged wfc if they have not been written previously
   ! ... FIXME: it shouldn't be necessary to do this here
   !
+  IF ( nks == 1 .AND. (io_level < 2) .AND. (io_level > -1) ) &
+        CALL using_evc(0) ! save buffer is intent(in)
   IF ( nks == 1 .AND. (io_level < 2) .AND. (io_level > -1) ) &
         CALL save_buffer ( evc, nwordwfc, iunwfc, nks )
   !

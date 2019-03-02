@@ -62,7 +62,7 @@ SUBROUTINE setup()
   USE control_flags,      ONLY : tr2, ethr, lscf, lbfgs, lmd, david, lecrpa,  &
                                  isolve, niter, noinv, ts_vdw, &
                                  lbands, use_para_diag, gamma_only, &
-                                 restart
+                                 restart, use_gpu
   USE cellmd,             ONLY : calc
   USE uspp_param,         ONLY : upf, n_atom_wfc
   USE uspp,               ONLY : okvan
@@ -93,7 +93,7 @@ SUBROUTINE setup()
   LOGICAL  :: magnetic_sym, skip_equivalence=.FALSE.
   REAL(DP) :: iocc, ionic_charge, one
   !
-  LOGICAL, EXTERNAL  :: check_para_diag
+  LOGICAL, EXTERNAL  :: check_para_diag, check_gpu_support
   !
   TYPE(output_type)                         :: output_obj 
   TYPE(parallel_info_type)                  :: parinfo_obj
@@ -388,6 +388,7 @@ SUBROUTINE setup()
   IF ( isolve == 0 ) nbndx = david * nbnd
   !
   use_para_diag = check_para_diag( nbnd )
+  use_gpu       = check_gpu_support( )
   !
   ! ... Set the units in real and reciprocal space
   !
@@ -697,3 +698,36 @@ LOGICAL FUNCTION check_para_diag( nbnd )
 #endif
   RETURN
 END FUNCTION check_para_diag
+!
+!----------------------------------------------------------------------------
+LOGICAL FUNCTION check_gpu_support( )
+  !
+  USE io_global,        ONLY : stdout, ionode, ionode_id
+  !
+  IMPLICIT NONE
+  !
+  LOGICAL, SAVE :: first = .TRUE.
+  LOGICAL, SAVE :: saved_value = .FALSE.
+  CHARACTER(len=255) :: gpu_env
+  INTEGER :: vlen, istat
+
+#if defined(__CUDA)
+  IF( .NOT. first ) THEN
+      check_gpu_support = saved_value
+      RETURN
+  END IF
+  first = .FALSE.
+  !
+  CALL get_environment_variable("USEGPU", gpu_env, vlen, istat, .true.)
+  IF (istat == 0) THEN
+     check_gpu_support = (gpu_env /= "no")
+  ELSE 
+     check_gpu_support = .TRUE.
+  END IF
+  saved_value = check_gpu_support
+  !
+#else
+  check_gpu_support = .FALSE.
+#endif
+  RETURN
+END FUNCTION check_gpu_support

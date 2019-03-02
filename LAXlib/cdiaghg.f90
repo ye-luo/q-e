@@ -189,6 +189,172 @@ SUBROUTINE cdiaghg( n, m, h, s, ldh, e, v )
   !
 END SUBROUTINE cdiaghg
 !
+#if defined(__CUDA)
+!----------------------------------------------------------------------------
+SUBROUTINE cdiaghg_gpu( n, m, h_d, s_d, ldh, e_d, v_d )
+  !----------------------------------------------------------------------------
+  !
+  ! ... calculates eigenvalues and eigenvectors of the generalized problem
+  ! ... Hv=eSv, with H hermitean matrix, S overlap matrix.
+  ! ... On output both matrix are unchanged
+  !
+  !
+  USE cudafor
+  USE zhegvdx_gpu
+  USE la_param,          ONLY : DP
+  USE mp,                ONLY : mp_bcast, mp_sum, mp_barrier, mp_max
+  USE mp_bands_util,     ONLY : me_bgrp, root_bgrp, intra_bgrp_comm
+#define __USE_GLOBAL_BUFFER
+#if defined(__USE_GLOBAL_BUFFER)
+  USE gbuffers,        ONLY : dev=>dev_buf, pin=>pin_buf
+#define VARTYPE POINTER
+#else
+#define VARTYPE ALLOCATABLE
+#endif
+  !
+  IMPLICIT NONE
+  !
+  INTEGER, INTENT(IN) :: n, m, ldh
+    ! dimension of the matrix to be diagonalized
+    ! number of eigenstates to be calculate
+    ! leading dimension of h, as declared in the calling pgm unit
+  COMPLEX(DP), DEVICE, INTENT(INOUT) :: h_d(ldh,n), s_d(ldh,n)
+    ! actually intent(in) but compilers don't know and complain
+    ! matrix to be diagonalized, allocated on the GPU
+    ! overlap matrix, allocated on the GPU
+  REAL(DP), DEVICE, INTENT(OUT) :: e_d(n)
+    ! eigenvalues, , allocated on the GPU
+  COMPLEX(DP), DEVICE,  INTENT(OUT) :: v_d(ldh,n)
+    ! eigenvectors (column-wise), , allocated on the GPU
+    ! NB: the dimension of v_d this is different from cdiaghg !!
+  !
+  INTEGER              :: lwork, info
+  !
+  REAL(DP)             :: abstol
+  INTEGER, ALLOCATABLE :: ifail(:)
+  INTEGER, VARTYPE     :: iwork(:)
+  REAL(DP), VARTYPE    :: rwork(:)
+  COMPLEX(DP), VARTYPE :: work(:)
+  !
+  COMPLEX(DP), VARTYPE :: v_h(:,:)
+  REAL(DP), VARTYPE    :: e_h(:)
+#if ! defined(__USE_GLOBAL_BUFFER)
+  ATTRIBUTES( PINNED ) :: work, iwork, rwork, v_h, e_h
+#endif
+  !
+  INTEGER              :: lwork_d, lrwork_d, liwork, lrwork
+  REAL(DP), VARTYPE    :: rwork_d(:)
+  COMPLEX(DP), VARTYPE :: work_d(:)
+  ! various work space
+  !
+  ! Temp arrays to save H and S.
+  REAL(DP), VARTYPE    :: h_diag_d(:), s_diag_d(:)
+  ATTRIBUTES( DEVICE ) :: work_d, rwork_d, h_diag_d, s_diag_d
+#undef VARTYPE
+  INTEGER :: i, j
+  !
+  !
+  !
+  !
+  CALL start_clock( 'cdiaghg_gpu' )
+  !
+  ! ... only the first processor diagonalizes the matrix
+  !
+  IF ( me_bgrp == root_bgrp ) THEN
+#if ! defined(__USE_GLOBAL_BUFFER)
+      ! NB: dimension is different!
+      ALLOCATE(v_h(ldh,n), e_h(n))
+      ALLOCATE(h_diag_d(n) , s_diag_d(n))
+#else
+      CALL pin%lock_buffer( v_h, (/ldh,n/), info )
+      CALL pin%lock_buffer( e_h, n, info )
+      !
+      CALL dev%lock_buffer( h_diag_d, n, info )
+      CALL dev%lock_buffer( s_diag_d, n, info )
+#endif
+      !
+      lwork  = n
+      lrwork = 1+5*n+2*n*n
+      liwork = 3+5*n
+      !
+      lwork_d  = 2*64*64 + 65 * n
+      lrwork_d = n
+      !
+#if ! defined(__USE_GLOBAL_BUFFER)
+      ALLOCATE(work(lwork), rwork(lrwork), iwork(liwork))
+      !
+      ALLOCATE(work_d(1*lwork_d), STAT = info)
+      IF( info /= 0 ) CALL errore( ' cdiaghg_gpu ', ' allocate work_d ', ABS( info ) )
+      !
+      ALLOCATE(rwork_d(1*lrwork_d), STAT = info)
+      IF( info /= 0 ) CALL errore( ' cdiaghg_gpu ', ' allocate rwork_d ', ABS( info ) )
+#else
+      CALL pin%lock_buffer(work, lwork, info)
+      CALL pin%lock_buffer(rwork, lrwork, info)
+      CALL pin%lock_buffer(iwork, liwork, info)
+      CALL dev%lock_buffer( work_d,  lwork_d, info)
+      CALL dev%lock_buffer( rwork_d, lrwork_d, info)
+#endif
+      !
+      !$cuf kernel do(1) <<<*,*>>>
+      DO i = 1, n
+         h_diag_d(i) = DBLE( h_d(i,i) )
+         s_diag_d(i) = DBLE( s_d(i,i) )
+      END DO
+      CALL zhegvdx_gpu(n, h_d, ldh, s_d, ldh, v_d, ldh, 1, m, e_d, work_d,&
+                       lwork_d, rwork_d, lrwork_d, &
+                       work, lwork, rwork, lrwork, &
+                       iwork, liwork, v_h, SIZE(v_h, 1), e_h, info, .TRUE.)
+      !
+
+      IF( info /= 0 ) CALL errore( ' cdiaghg_gpu ', ' zhegvdx_gpu failed ', ABS( info ) )
+      !
+!$cuf kernel do(1) <<<*,*>>>
+      DO i = 1, n
+         h_d(i,i) = DCMPLX( h_diag_d(i), 0.0_DP)
+         s_d(i,i) = DCMPLX( s_diag_d(i), 0.0_DP)
+         DO j = i + 1, n
+            h_d(i,j) = DCONJG( h_d(j,i) )
+            s_d(i,j) = DCONJG( s_d(j,i) )
+         END DO
+         DO j = n + 1, ldh
+            h_d(j,i) = ( 0.0_DP, 0.0_DP )
+            s_d(j,i) = ( 0.0_DP, 0.0_DP )
+         END DO
+      END DO
+#if ! defined(__USE_GLOBAL_BUFFER)
+      DEALLOCATE(h_diag_d, s_diag_d)
+      !
+      DEALLOCATE(work, rwork, iwork)
+      DEALLOCATE(work_d, rwork_d)
+      DEALLOCATE(v_h, e_h)
+#else
+      CALL dev%release_buffer( h_diag_d, info )
+      CALL dev%release_buffer( s_diag_d, info)
+      !
+      CALL pin%release_buffer(work, info)
+      CALL pin%release_buffer(rwork, info)
+      CALL pin%release_buffer(iwork, info)
+      CALL dev%release_buffer( work_d,  info)
+      CALL dev%release_buffer( rwork_d, info)
+      CALL pin%release_buffer(v_h, info)
+      CALL pin%release_buffer(e_h, info)
+#endif
+     !
+  END IF
+  !
+  ! ... broadcast eigenvectors and eigenvalues to all other processors
+  !
+  CALL mp_bcast( e_d(1:n), root_bgrp, intra_bgrp_comm )
+  CALL mp_bcast( v_d(1:ldh, 1:m), root_bgrp, intra_bgrp_comm )
+  !
+  CALL stop_clock( 'cdiaghg_gpu' )
+  !
+  RETURN
+  !
+END SUBROUTINE cdiaghg_gpu
+#endif
+!
 !----------------------------------------------------------------------------
 SUBROUTINE pcdiaghg( n, h, s, ldh, e, v, desc )
   !----------------------------------------------------------------------------

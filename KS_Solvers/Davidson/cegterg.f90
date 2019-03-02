@@ -21,6 +21,7 @@ SUBROUTINE cegterg( h_psi, s_psi, uspp, g_psi, &
   ! ... where H is an hermitean operator, e is a real scalar,
   ! ... S is an overlap matrix, evc is a complex vector
   !
+  USE LAXlib,        ONLY : diaghg
   USE david_param,   ONLY : DP
   USE mp_bands_util, ONLY : intra_bgrp_comm, inter_bgrp_comm, root_bgrp_id,&
                             nbgrp, my_bgrp_id
@@ -240,7 +241,7 @@ SUBROUTINE cegterg( h_psi, s_psi, uspp, g_psi, &
      !
      CALL start_clock( 'cegterg:diag' )
      IF( my_bgrp_id == root_bgrp_id ) THEN
-        CALL cdiaghg( nbase, nvec, hc, sc, nvecx, ew, vc )
+        CALL diaghg( nbase, nvec, hc, sc, nvecx, ew, vc )
      END IF
      IF( nbgrp > 1 ) THEN
         CALL mp_bcast( vc, root_bgrp_id, inter_bgrp_comm )
@@ -431,7 +432,7 @@ SUBROUTINE cegterg( h_psi, s_psi, uspp, g_psi, &
      !
      CALL start_clock( 'cegterg:diag' )
      IF( my_bgrp_id == root_bgrp_id ) THEN
-        CALL cdiaghg( nbase, nvec, hc, sc, nvecx, ew, vc )
+        CALL diaghg( nbase, nvec, hc, sc, nvecx, ew, vc )
      END IF
      IF( nbgrp > 1 ) THEN
         CALL mp_bcast( vc, root_bgrp_id, inter_bgrp_comm )

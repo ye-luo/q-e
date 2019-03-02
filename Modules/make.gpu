@@ -1,0 +1,37 @@
+MODULES += \
+  wavefunctions_gpu.o \
+  recvec_gpu.o \
+  uspp_gpu.o \
+  becmod_gpu.o \
+  becmod_subs_gpu.o \
+  cuda_subroutines.o \
+  ylmr2_gpu.o \
+  splinelib_gpu.o \
+  random_numbers_gpu.o
+
+MODFLAGS += \
+         $(MOD_FLAG)../GScratch
+
+becmod_gpu.o : becmod.o
+becmod_gpu.o : control_flags.o
+becmod_gpu.o : kind.o
+becmod_subs_gpu.o : becmod_gpu.o
+becmod_subs_gpu.o : control_flags.o
+becmod_subs_gpu.o : kind.o
+becmod_subs_gpu.o : mp_bands.o
+becmod_subs_gpu.o : noncol.o
+becmod_subs_gpu.o : recvec.o
+dylmr2_gpu.o : kind.o
+random_numbers_gpu.o : kind.o
+random_numbers_gpu.o : random_numbers.o
+recvec.o : control_flags.o
+recvec_gpu.o : control_flags.o
+recvec_gpu.o : kind.o
+recvec_gpu.o : recvec.o
+splinelib_gpu.o : kind.o
+uspp_gpu.o : control_flags.o
+uspp_gpu.o : kind.o
+uspp_gpu.o : uspp.o
+wavefunctions_gpu.o : control_flags.o
+wavefunctions_gpu.o : kind.o
+wavefunctions_gpu.o : wavefunctions.o

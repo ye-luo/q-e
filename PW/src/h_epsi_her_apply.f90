@@ -39,6 +39,8 @@ subroutine h_epsi_her_apply(lda, n,nbande, psi, hpsi, pdir, e_field)
   USE mp_bands,  ONLY : intra_bgrp_comm
   USE mp,        ONLY : mp_sum
   !
+  USE uspp_gpum, ONLY : using_qq_at, using_qq_so, using_vkb
+  !
   implicit none
   INTEGER, INTENT(in) :: pdir!direction on which the polarization is calculated
   REAL(DP) :: e_field!electric field along pdir    
@@ -71,6 +73,9 @@ subroutine h_epsi_her_apply(lda, n,nbande, psi, hpsi, pdir, e_field)
   eps=0.000001d0
   if(ABS(e_field)<eps) return
   call start_clock('h_epsi_apply')
+  !
+  CALL using_qq_at(0)
+  IF (lspinorb) CALL using_qq_so(0)
 
   ALLOCATE( evct(npwx*npol,nbnd))
   call allocate_bec_type(nkb,nbnd,becp0)
@@ -89,6 +94,7 @@ subroutine h_epsi_her_apply(lda, n,nbande, psi, hpsi, pdir, e_field)
             END IF
          END DO
       END DO
+      CALL using_vkb(0)
       CALL calbec ( npw, vkb, psi, becp0, nbande )
   endif
 
@@ -225,6 +231,7 @@ subroutine h_epsi_her_apply(lda, n,nbande, psi, hpsi, pdir, e_field)
         enddo
      enddo
      call stop_clock('h_eps_van2')
+     CALL using_vkb(0)
      call ZGEMM ('N', 'N', npw, nbnd*npol , nkb, (1.d0, 0.d0) , vkb, &!vkb is relative to the last ik read
           npwx, ps, nkb, (1.d0, 0.d0) , evct, npwx)
 !!!

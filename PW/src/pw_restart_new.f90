@@ -135,6 +135,9 @@ MODULE pw_restart_new
       USE control_flags,        ONLY : conv_elec, conv_ions, ldftd3
       USE input_parameters,     ONLY :  ts_vdw_econv_thr, ts_vdw_isolated
       !
+      USE wvfct_gpum,           ONLY : using_et, using_wg
+      USE wavefunctions_gpum,   ONLY : using_evc
+      !
       IMPLICIT NONE
       !
       CHARACTER(LEN=*), INTENT(IN) :: what
@@ -193,6 +196,10 @@ MODULE pw_restart_new
       !
       ! Global PW dimensions need to be properly computed, reducing across MPI tasks
       ! If local PW dimensions are not available, set to 0
+      !
+      CALL using_et(0)
+      CALL using_wg(0)
+      CALL using_evc(0)
       !
       ALLOCATE( ngk_g( nkstot ) )
       ngk_g(:) = 0
@@ -692,6 +699,8 @@ MODULE pw_restart_new
       USE mp_pools,             ONLY : intra_pool_comm, inter_pool_comm
       USE mp_bands,             ONLY : my_bgrp_id, root_bgrp, intra_bgrp_comm,&
                                        root_bgrp_id, nbgrp
+      USE wavefunctions_gpum,   ONLY : using_evc
+      USE wvfct_gpum,           ONLY : using_et
       !
       IMPLICIT NONE
       !
@@ -703,6 +712,8 @@ MODULE pw_restart_new
       CHARACTER(LEN=2), DIMENSION(2) :: updw = (/ 'up', 'dw' /)
       CHARACTER(LEN=256)    :: dirname
       CHARACTER(LEN=320)    :: filename
+      !
+      CALL using_evc(0); CALL using_et(0) !? Is this needed? et never used!
       !
       dirname = TRIM( tmp_dir ) // TRIM( prefix ) // postfix
       !
@@ -767,6 +778,7 @@ MODULE pw_restart_new
          !
          ! ... read wavefunctions - do not read if already in memory (nsk==1)
          !
+         IF ( nks > 1 ) CALL using_evc(2)
          IF ( nks > 1 ) CALL get_buffer ( evc, nwordwfc, iunwfc, ik )
          !
          IF ( nspin == 2 ) THEN
@@ -788,6 +800,7 @@ MODULE pw_restart_new
          ! ... Only the first band group of each pool writes
          ! ... No warranty it works for more than one band group
          !
+         IF ( my_bgrp_id == root_bgrp_id ) CALL using_evc(0)
          IF ( my_bgrp_id == root_bgrp_id ) CALL write_wfc( iunpun, &
               filename, root_bgrp, intra_bgrp_comm, ik_g, tpiba*xk(:,ik), &
               ispin, nspin, evc, npw_g, gamma_only, nbnd, &
@@ -2045,6 +2058,7 @@ MODULE pw_restart_new
       USE wvfct,    ONLY : et, wg, nbnd
       USE ener,     ONLY : ef, ef_up, ef_dw
       USE qes_types_module, ONLY : band_structure_type
+      USE wvfct_gpum,       ONLY : using_et, using_wg, using_wg_d
       !
       IMPLICIT NONE
       TYPE ( band_structure_type)         :: band_struct_obj
@@ -2081,6 +2095,7 @@ MODULE pw_restart_new
          ef_up = 0.d0
          ef_dw = 0.d0
       END IF 
+      CALL using_et(1); CALL using_wg(1)
       DO ik =1, band_struct_obj%ndim_ks_energies
          IF ( band_struct_obj%lsda) THEN
             IF ( band_struct_obj%nbnd_up_ispresent .AND. band_struct_obj%nbnd_dw_ispresent) THEN
@@ -2110,7 +2125,10 @@ MODULE pw_restart_new
             et (1:nbnd_,ik) = band_struct_obj%ks_energies(ik)%eigenvalues%vector(1:nbnd_)*e2
             wg (1:nbnd_,ik) = band_struct_obj%ks_energies(ik)%occupations%vector(1:nbnd_)*wk(ik)
          END IF  
-      END DO 
+      END DO
+#if defined(__CUDA)
+      CALL using_wg_d(1)
+#endif
     END SUBROUTINE readschema_band_structure 
     !
     !--------------------------------------------------------------------------
@@ -2145,6 +2163,7 @@ MODULE pw_restart_new
                                        intra_pool_comm, inter_pool_comm
       USE mp,                   ONLY : mp_sum, mp_max
       USE io_base,              ONLY : read_wfc
+      USE wavefunctions_gpum, ONLY : using_evc
       !
       IMPLICIT NONE
       !
@@ -2216,6 +2235,7 @@ MODULE pw_restart_new
          CALL gk_l2gmap_kdip( npw_g, ngk_g(ik_g), ngk(ik), igk_l2g, &
                               igk_l2g_kdip )
          !
+         CALL using_evc(2)
          evc=(0.0_DP, 0.0_DP)
          !
          IF ( nspin == 2 ) THEN
@@ -2233,6 +2253,7 @@ MODULE pw_restart_new
             !
          ENDIF
          !
+         CALL using_evc(2)
          CALL read_wfc( iunpun, filename, root_bgrp, intra_bgrp_comm, &
               ik_g, xk_, ispin, npol_, evc, npw_g, gamma_only, nbnd_, &
               igk_l2g_kdip(:), ngk(ik), b1, b2, b3, mill_k, scalef )
@@ -2245,6 +2266,8 @@ MODULE pw_restart_new
                  & I6," bands were read from file")')  nbnd, nbnd_  
             CALL errore ('pw_restart - read_collected_to_evc', msg, 1 )
          END IF
+         !
+         CALL using_evc(0)
          CALL save_buffer ( evc, nwordwfc, iunwfc, ik )
          ! 
       END DO k_points_loop

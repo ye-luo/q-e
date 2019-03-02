@@ -26,12 +26,16 @@ subroutine stres_knl (sigmanlc, sigmakin)
   USE mp_pools,             ONLY: inter_pool_comm
   USE mp_bands,             ONLY: intra_bgrp_comm
   USE mp,                   ONLY: mp_sum
+
+  USE wavefunctions_gpum, ONLY: using_evc
+
   implicit none
   real(DP) :: sigmanlc (3, 3), sigmakin (3, 3)
   real(DP), allocatable :: gk (:,:), kfac (:)
   real(DP) :: twobysqrtpi, gk2, arg
   integer :: npw, ik, l, m, i, ibnd, is
-
+  !
+  CALL using_evc(0)
   allocate (gk(npwx,3))
   allocate (kfac(npwx))
 
@@ -44,6 +48,7 @@ subroutine stres_knl (sigmanlc, sigmakin)
   do ik = 1, nks
      if (nks > 1) &
         call get_buffer (evc, nwordwfc, iunwfc, ik)
+     if (nks > 1) CALL using_evc(2)
      npw = ngk(ik)
      do i = 1, npw
         gk (i, 1) = (xk (1, ik) + g (1, igk_k(i,ik) ) ) * tpiba

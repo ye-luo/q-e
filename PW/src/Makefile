@@ -248,6 +248,8 @@ QEMODS=../../Modules/libqemod.a \
        ../../KS_Solvers/libks_solvers.a \
        ../../FFTXlib/libqefft.a ../../LAXlib/libqela.a ../../UtilXlib/libutil.a ../../dft-d3/libdftd3qe.a
 
+-include make.gpu
+
 TLDEPS= bindir libs mods libks_solvers dftd3
 
 all : tldeps pw.x generate_vdW_kernel_table.x generate_rVV10_kernel_table.x

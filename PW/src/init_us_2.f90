@@ -30,6 +30,8 @@ subroutine init_us_2 (npw_, igk_, q_, vkb_)
   USE uspp,       ONLY : nkb, nhtol, nhtolm, indv
   USE uspp_param, ONLY : upf, lmaxkb, nhm, nh
   !
+  USE us_gpum,    ONLY : using_tab, using_tab_d2y
+  !
   implicit none
   !
   INTEGER, INTENT (IN) :: npw_, igk_ (npw_)
@@ -55,8 +57,9 @@ subroutine init_us_2 (npw_, igk_, q_, vkb_)
   !
   if (lmaxkb.lt.0) return
   call start_clock ('init_us_2')
-
-!   write(*,'(3i4,i5,3f10.5)') size(tab,1), size(tab,2), size(tab,3), size(vq), q_
+  !
+  call using_tab(0)
+  if (spline_ps) call using_tab_d2y(0)
 
   ! setting cache blocking size
   numblock  = (npw_+blocksize-1)/blocksize

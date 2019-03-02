@@ -28,6 +28,8 @@ subroutine wannier_proj(ik, wan_func)
   USE noncollin_module, ONLY : npol
   USE buffers,          ONLY : get_buffer, save_buffer
 
+  USE wavefunctions_gpum, ONLY : using_evc
+  USE wvfct_gpum,                ONLY : using_et
   
   implicit none
   ! input-output
@@ -55,6 +57,9 @@ subroutine wannier_proj(ik, wan_func)
   ! See comment in PP/src/openfil.f90 why davcio and not get_buffer
   ! call get_buffer ( evc, nwordwfc, iunwfc, ik )  
   call davcio ( evc, 2*nwordwfc, iunwfc, ik, -1 )  
+  !
+  CALL using_evc(2); CALL using_et(0)
+  !
   ! Reads ortho-atomic wfc
   ! You should prepare data using orthoatwfc.f90
   swfcatom = ZERO

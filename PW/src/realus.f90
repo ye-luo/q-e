@@ -207,6 +207,8 @@ MODULE realus
       USE mp_bands,   ONLY : intra_bgrp_comm
       USE mp,         ONLY : mp_sum
       !
+      USE uspp_gpum,  ONLY : using_qq_at
+      !
       IMPLICIT NONE
       !
       TYPE(fft_type_descriptor),INTENT(in)    :: dfft
@@ -287,6 +289,8 @@ MODULE realus
       inv_nr1 = 1.D0 / dble( dfft%nr1 )
       inv_nr2 = 1.D0 / dble( dfft%nr2 )
       inv_nr3 = 1.D0 / dble( dfft%nr3 )
+      !
+      CALL using_qq_at(1)
       !
       ! the qq_at matrices are recalculated  here. initialize them 
       qq_at(:,:,:) =0.d0
@@ -371,6 +375,8 @@ MODULE realus
          CALL real_space_q( nt, ia, mbia, tabp )
          !
       ENDDO
+      !
+      CALL using_qq_at(1)
       ! collect the result of the qq_at matrix across processors 
       CALL mp_sum( qq_at, intra_bgrp_comm )
       ! and test that they don't differ too much from the result computed on the atomic grid
@@ -422,6 +428,8 @@ MODULE realus
       USE splinelib,  ONLY : spline, splint
       USE cell_base,  ONLY : omega
       USE fft_base,   ONLY : dfftp
+      !
+      USE uspp_gpum,  ONLY : using_qq_at
       !
       IMPLICIT NONE
       !
@@ -549,6 +557,8 @@ MODULE realus
             ENDDO
          ENDDO
       ENDDO
+      !
+      CALL using_qq_at(1)
       ! compute qq_at interating qr in the sphere 
       ijh = 0
       DO ih = 1, nh(nt)
@@ -1166,6 +1176,8 @@ MODULE realus
       USE gvect,            ONLY : gstart
 #endif
       !
+      USE uspp_gpum,        ONLY : using_becsum
+      !
       IMPLICIT NONE
       ! The charge density to be augmented (in G-space)
       COMPLEX(kind=dp), INTENT(inout) :: rho(dfftp%ngm,nspin_mag)
@@ -1179,6 +1191,8 @@ MODULE realus
       IF ( .not. okvan ) RETURN
       !
       CALL start_clock( 'addusdens' )
+      !
+      CALL using_becsum(0)
       !
       ALLOCATE ( rhor(dfftp%nnr,nspin_mag) )
       rhor(:,:) = 0.0_dp
@@ -1263,6 +1277,8 @@ MODULE realus
       USE mp_bands,   ONLY : intra_bgrp_comm
       USE mp,         ONLY : mp_sum
       !
+      USE uspp_gpum,  ONLY : using_becsum, using_ebecsum
+      !
       IMPLICIT NONE
       !
       REAL(DP), INTENT(INOUT) :: forcenl (3, nat)
@@ -1272,6 +1288,8 @@ MODULE realus
       REAL(dp) :: dqrforce(3), dqb(3), dqeb(3), v_eff
       !
       IF (.not.okvan) RETURN
+      !
+      CALL using_becsum(0); CALL using_ebecsum(0)
       !
       ALLOCATE ( forceq(3,nat) )
       forceq(:,:) = 0.0_dp
@@ -1342,6 +1360,8 @@ MODULE realus
       USE mp_bands,   ONLY : intra_bgrp_comm
       USE mp,         ONLY : mp_sum
       !
+      USE uspp_gpum,  ONLY : using_becsum, using_ebecsum
+      !
       IMPLICIT NONE
       !
       REAL(DP), INTENT(INOUT) :: sigmanl (3,3)
@@ -1351,6 +1371,8 @@ MODULE realus
       REAL(dp) :: sus(3,3), sus_at(3,3), qb, qeb, dqb(3), dqeb(3), v_eff
       !
       IF (.not.okvan) RETURN
+      !
+      CALL using_becsum(0); CALL using_ebecsum(0)
       !
       sus(:,:) = 0.0_dp
       !
@@ -1569,6 +1591,8 @@ MODULE realus
     USE mp_bands,              ONLY : intra_bgrp_comm
     USE mp,                    ONLY : mp_sum
     !
+    USE becmod_gpum,           ONLY : using_becp_k
+    !
     IMPLICIT NONE
     !
     INTEGER, INTENT(in) :: ibnd, last
@@ -1583,6 +1607,7 @@ MODULE realus
     !
     !
     CALL start_clock( 'calbec_rs' )
+    CALL using_becp_k(1) ! intento=2?
     !
     IF( dffts%has_task_groups ) CALL errore( 'calbec_rs_k', 'task_groups not implemented', 1 )
 
@@ -1649,6 +1674,9 @@ MODULE realus
       USE becmod,                 ONLY : bec_type, becp
       USE fft_base,               ONLY : dffts
       !
+      USE uspp_gpum,              ONLY : using_qq_at
+      USE becmod_gpum,            ONLY : using_becp_r
+      !
       IMPLICIT NONE
       !
       INTEGER, INTENT(in) :: ibnd, last
@@ -1663,6 +1691,9 @@ MODULE realus
 
       IF( dffts%has_task_groups ) CALL errore( 's_psir_gamma', 'task_groups not implemented', 1 )
 
+      ! Sync
+      CALL using_qq_at(0)
+      CALL using_becp_r(0)
       !
       fac = sqrt(omega)
       !
@@ -1732,6 +1763,9 @@ MODULE realus
       USE becmod,                 ONLY : bec_type, becp
       USE fft_base,               ONLY : dffts
       !
+      USE uspp_gpum,              ONLY : using_qq_at
+      USE becmod_gpum,            ONLY : using_becp_k
+      !
       IMPLICIT NONE
       !
       INTEGER, INTENT(in) :: ibnd, last
@@ -1746,6 +1780,10 @@ MODULE realus
       CALL start_clock( 's_psir' )
    
       IF( dffts%has_task_groups ) CALL errore( 's_psir_k', 'task_groups not implemented', 1 )
+
+      ! Sync
+      CALL using_qq_at(0)
+      CALL using_becp_k(0)
 
       call set_xkphase(current_k)
 
@@ -1820,6 +1858,9 @@ MODULE realus
   USE becmod,                 ONLY : bec_type, becp
   USE fft_base,               ONLY : dffts
   !
+  USE uspp_gpum,              ONLY : using_deeq
+  USE becmod_gpum,            ONLY : using_becp_r
+  !
   IMPLICIT NONE
   !
   INTEGER, INTENT(in) :: ibnd, last
@@ -1838,6 +1879,8 @@ MODULE realus
 
   ELSE !non task groups part starts here
 
+   CALL using_deeq(0)
+   CALL using_becp_r(0)
    !
    fac = sqrt(omega)
    !
@@ -1922,6 +1965,9 @@ MODULE realus
   USE becmod,                 ONLY : bec_type, becp
   USE fft_base,               ONLY : dffts
   !
+  USE uspp_gpum,              ONLY : using_deeq
+  USE becmod_gpum,            ONLY : using_becp_k
+  !
   IMPLICIT NONE
   !
   INTEGER, INTENT(in) :: ibnd, last
@@ -1936,6 +1982,9 @@ MODULE realus
   CALL start_clock( 'add_vuspsir' )
 
   IF( dffts%has_task_groups ) CALL errore( 'add_vuspsir_k', 'task_groups not implemented', 1 )
+
+  CALL using_deeq(0)
+  CALL using_becp_k(0)
 
   call set_xkphase(current_k)
    !
@@ -2398,6 +2447,8 @@ MODULE realus
     USE mp_bands,      ONLY : me_bgrp
     USE scf,           ONLY : vrs
     USE lsda_mod,      ONLY : current_spin
+    !
+    USE scf_gpum,      ONLY : using_vrs
 
     IMPLICIT NONE
 
@@ -2408,6 +2459,8 @@ MODULE realus
     !Task groups
     REAL(DP),    ALLOCATABLE :: tg_v(:)
     CALL start_clock( 'v_loc_psir' )
+
+    CALL using_vrs(0) ! tg_gather (intent: in)
 
     IF( dffts%has_task_groups ) THEN
         IF (ibnd == 1 ) THEN
@@ -2446,6 +2499,8 @@ MODULE realus
     USE mp_bands,      ONLY : me_bgrp
     USE scf,           ONLY : vrs
     USE lsda_mod,      ONLY : current_spin
+    !
+    USE scf_gpum,      ONLY : using_vrs
 
     IMPLICIT NONE
 
@@ -2456,6 +2511,8 @@ MODULE realus
     !Task groups
     REAL(DP),    ALLOCATABLE :: tg_v(:)
     CALL start_clock( 'v_loc_psir' )
+
+    CALL using_vrs(0) ! tg_gather (intent: in)
 
     IF( dffts%has_task_groups ) THEN
         IF (ibnd == 1 ) THEN

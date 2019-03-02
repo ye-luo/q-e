@@ -317,6 +317,9 @@ MODULE exx
          exx_divergence
     USE exx_band,             ONLY : change_data_structure, nwordwfc_exx, &
          transform_evc_to_exx, igk_exx, evc_exx
+
+    USE wavefunctions_gpum, ONLY : using_evc
+    USE uspp_gpum,                 ONLY : using_vkb ! is this needed?
     !
     IMPLICIT NONE
     INTEGER :: ik,ibnd, i, j, k, ir, isym, ikq, ig
@@ -1639,6 +1642,9 @@ MODULE exx
     USE uspp,                   ONLY : okvan,nkb,vkb
     USE exx_band,               ONLY : nwordwfc_exx, igk_exx
 
+    USE wavefunctions_gpum, ONLY : using_evc
+    USE uspp_gpum,                 ONLY : using_vkb 
+
     IMPLICIT NONE
 
     TYPE(bec_type) :: becpsi
@@ -1654,6 +1660,8 @@ MODULE exx
     IF(okvan) CALL allocate_bec_type( nkb, nbnd, becpsi)
     energy = 0._dp
 
+    CALL using_evc(0)
+
     DO ik=1,nks
        npw = ngk (ik)
        ! setup variables for usage by vexx (same logic as for H_psi)
@@ -1667,6 +1675,7 @@ MODULE exx
        ENDIF
        !
        IF(okvan)THEN
+          CALL using_vkb(1)
           ! prepare the |beta> function at k+q
           CALL init_us_2(npw, igk_exx(1,ik), xk(:,ik), vkb)
           ! compute <beta_I|psi_j> at this k+q point, for all band and all projectors
@@ -2712,6 +2721,8 @@ SUBROUTINE compute_becpsi (npw_, igk_, q_, evc_exx, becpsi_k)
   USE becmod,     ONLY : calbec
   USE mp_exx,     ONLY : ibands, nibands, my_egrp_id
   !
+  USE us_gpum,    ONLY : using_tab, using_tab_d2y
+  !
   implicit none
   !
   INTEGER, INTENT (IN) :: npw_, igk_ (npw_)
@@ -2739,6 +2750,10 @@ SUBROUTINE compute_becpsi (npw_, igk_, q_, evc_exx, becpsi_k)
   !
   !
   if (lmaxkb.lt.0) return
+  !
+  call using_tab(0)
+  if (spline_ps) call using_tab_d2y(0)
+  !
   allocate (vkb1( npw_,nhm))    
   allocate (  sk( npw_))    
   allocate (  qg( npw_))    
@@ -2867,6 +2882,9 @@ SUBROUTINE aceinit( DoLoc, exex )
   USE mp,         ONLY : mp_sum
   USE wavefunctions, ONLY : evc
   !
+  USE wavefunctions_gpum, ONLY : using_evc
+  USE uspp_gpum,          ONLY : using_vkb
+  !
   IMPLICIT NONE
   !
   REAL (DP) :: ee, eexx
@@ -2880,6 +2898,8 @@ SUBROUTINE aceinit( DoLoc, exex )
     CALL errore('aceinit','n_proj must be between occ and tot.',1)
   END IF 
 
+  CALL using_evc(0)
+
   IF (.not. allocated(xi)) ALLOCATE( xi(npwx*npol,nbndproj,nks) )
   IF ( okvan ) CALL allocate_bec_type( nkb, nbnd, becpsi)
   eexx = 0.0d0
@@ -2889,7 +2909,9 @@ SUBROUTINE aceinit( DoLoc, exex )
      current_k = ik
      IF ( lsda ) current_spin = isk(ik)
      IF ( nks > 1 ) CALL get_buffer(evc, nwordwfc, iunwfc, ik)
+     IF ( nks > 1 ) CALL using_evc(2)
      IF ( okvan ) THEN
+        CALL using_vkb(1)
         CALL init_us_2(npw, igk_k(1,ik), xk(:,ik), vkb)
         CALL calbec ( npw, vkb, evc, becpsi, nbnd )
      ENDIF

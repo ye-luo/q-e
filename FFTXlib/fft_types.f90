@@ -7,13 +7,21 @@
 ! or http://www.gnu.org/copyleft/gpl.txt .
 !
 
+#if defined(__CUDA)
+#define DEV_ATTRIBUTES , DEVICE
+#else
+#define DEV_ATTRIBUTES
+#endif
+
 !=----------------------------------------------------------------------------=!
 MODULE fft_types
 !=----------------------------------------------------------------------------=!
 
+#if defined(__CUDA)
+  USE cudafor
+#endif
   USE fft_support, ONLY : good_fft_order, good_fft_dimension
   USE fft_param
-
   IMPLICIT NONE
   PRIVATE
   SAVE
@@ -83,6 +91,10 @@ MODULE fft_types
     INTEGER, ALLOCATABLE :: ir1w_tg(:)! if >0 ir1w_tg(m1) is the incremental index of the active ( wfc ) X value in task group
     INTEGER, ALLOCATABLE :: indw_tg(:)! is the inverse of ir1w_tg
 
+    INTEGER, POINTER DEV_ATTRIBUTES :: ir1p_d(:),   ir1w_d(:),   ir1w_tg_d(:)   ! duplicated version of the arrays declared above
+    INTEGER, POINTER DEV_ATTRIBUTES :: indp_d(:,:), indw_d(:,:), indw_tg_d(:,:) !
+    INTEGER, POINTER DEV_ATTRIBUTES :: nr1p_d(:),   nr1w_d(:),   nr1w_tg_d(:)   !
+
     INTEGER :: nst      ! total number of sticks ( potential )
 
     INTEGER, ALLOCATABLE :: nsp(:)   ! number of sticks per processor ( potential ) using proc index starting from 1 
@@ -117,8 +129,14 @@ MODULE fft_types
     INTEGER, ALLOCATABLE :: iss(:)   ! index of the first rho stick on each proc
     INTEGER, ALLOCATABLE :: isind(:) ! for each position in the plane indicate the stick index
     INTEGER, ALLOCATABLE :: ismap(:) ! for each stick in the plane indicate the position
+
+    INTEGER, POINTER DEV_ATTRIBUTES :: ismap_d(:)
+
     INTEGER, ALLOCATABLE :: nl(:)    ! position of the G vec in the FFT grid
     INTEGER, ALLOCATABLE :: nlm(:)   ! with gamma sym. position of -G vec in the FFT grid
+
+    INTEGER, POINTER DEV_ATTRIBUTES :: nl_d(:)    ! duplication of the variables defined above
+    INTEGER, POINTER DEV_ATTRIBUTES :: nlm_d(:)   !
     !
     ! task group ALLTOALL communication layout
     INTEGER, ALLOCATABLE :: tg_snd(:) ! number of elements to be sent in task group redistribution
@@ -127,12 +145,29 @@ MODULE fft_types
     INTEGER, ALLOCATABLE :: tg_rdsp(:)! receive displacement for task group A2A communicattion
     !
     LOGICAL :: has_task_groups = .FALSE.
+    LOGICAL :: use_pencil_decomposition = .FALSE.
     !
     CHARACTER(len=12):: rho_clock_label  = ' '
     CHARACTER(len=12):: wave_clock_label = ' '
 
     INTEGER :: grid_id
+#if defined(__CUDA)
+    INTEGER(kind=cuda_stream_kind), allocatable, dimension(:) :: stream_scatter_yz
+    INTEGER(kind=cuda_stream_kind), allocatable, dimension(:) :: stream_many
+    INTEGER                                                   :: nstream_many = 16
 
+    INTEGER(kind=cuda_stream_kind) :: a2a_comp
+    INTEGER(kind=cuda_stream_kind), allocatable, dimension(:) :: bstreams
+    TYPE(cudaEvent), allocatable, dimension(:) :: bevents
+
+    INTEGER              :: batchsize = 16    ! how many ffts to batch together
+    INTEGER              :: subbatchsize = 4  ! size of subbatch for pipelining
+
+#if defined(__IPC)
+    INTEGER :: IPC_PEER(16)          ! This is used for IPC that is not imlpemented yet.
+#endif
+    INTEGER, ALLOCATABLE :: srh(:,:) ! Isend/recv handles by subbatch
+#endif
   END TYPE
 
   REAL(DP) :: fft_dual = 4.0d0
@@ -156,7 +191,8 @@ CONTAINS
     INTEGER, INTENT(IN), OPTIONAL :: fft_fact(3)
     INTEGER, INTENT(IN), OPTIONAL :: nyfft
     INTEGER, INTENT(in) :: comm ! mype starting from 0
-    INTEGER :: nx, ny, ierr, nzfft
+    INTEGER :: nx, ny, ierr, imany, nzfft
+    INTEGER :: i, nsubbatches
     INTEGER :: mype, root, nproc, nproc2, nproc3, iproc, iproc2, iproc3 ! mype starting from 0
     INTEGER :: color, key, comm2, comm3
      !write (6,*) ' inside fft_type_allocate' ; FLUSH(6)
@@ -259,6 +295,45 @@ CONTAINS
     ALLOCATE( desc%tg_sdsp( desc%nproc2) ) ; desc%tg_sdsp = 0
     ALLOCATE( desc%tg_rdsp( desc%nproc2) ) ; desc%tg_rdsp = 0
 
+#if defined(__CUDA)
+    ALLOCATE( desc%indp_d( desc%nr1x,desc%nproc2 ) ) ; desc%indp_d  = 0
+    ALLOCATE( desc%indw_d( desc%nr1x, desc%nproc2 ) ) ; desc%indw_d  = 0
+    ALLOCATE( desc%indw_tg_d( desc%nr1x, 1 ) ) ; desc%indw_tg_d  = 0
+    !
+    ALLOCATE( desc%nr1p_d(desc%nproc2)) ; desc%nr1p_d  = 0
+    ALLOCATE( desc%nr1w_d(desc%nproc2)) ; desc%nr1w_d  = 0
+    ALLOCATE( desc%nr1w_tg_d(1) ) ; desc%nr1w_tg_d = 0
+
+    ALLOCATE( desc%ir1p_d( desc%nr1x ) ) ; desc%ir1p_d  = 0
+    ALLOCATE( desc%ir1w_d( desc%nr1x ) ) ; desc%ir1w_d  = 0
+    ALLOCATE( desc%ir1w_tg_d( desc%nr1x ) ) ; desc%ir1w_tg_d  = 0
+    ALLOCATE( desc%ismap_d( nx * ny ) ) ; desc%ismap_d = 0
+    
+    ALLOCATE ( desc%stream_scatter_yz(desc%nproc3) ) ;
+    DO iproc = 1, desc%nproc3
+        ierr = cudaStreamCreate(desc%stream_scatter_yz(iproc))
+    END DO
+    !
+    ALLOCATE ( desc%stream_many(desc%nstream_many) ) ;
+    DO imany = 1, desc%nstream_many
+        ierr = cudaStreamCreate(desc%stream_many(imany))
+        IF ( ierr /= 0 ) CALL fftx_error__( ' fft_type_allocate ', ' Error creating stream ', imany )
+    END DO
+
+    ierr = cudaStreamCreate( desc%a2a_comp )
+
+    nsubbatches = ceiling(real(desc%batchsize)/desc%subbatchsize)
+
+    ALLOCATE( desc%bstreams( nsubbatches ) )
+    ALLOCATE( desc%bevents( nsubbatches ) )
+    DO i = 1, nsubbatches
+      ierr = cudaStreamCreate( desc%bstreams(i) )
+      ierr = cudaEventCreate( desc%bevents(i) )
+    ENDDO
+    ALLOCATE( desc%srh(2*nproc, nsubbatches))
+
+#endif
+
     incremental_grid_identifier = incremental_grid_identifier + 1
     desc%grid_id = incremental_grid_identifier
 
@@ -266,7 +341,8 @@ CONTAINS
 
   SUBROUTINE fft_type_deallocate( desc )
     TYPE (fft_type_descriptor) :: desc
-    INTEGER :: ierr
+    INTEGER :: iproc, ierr, imany
+    INTEGER :: i, nsubbatches
      !write (6,*) ' inside fft_type_deallocate' ; FLUSH(6)
     IF ( ALLOCATED( desc%nr2p ) )   DEALLOCATE( desc%nr2p )
     IF ( ALLOCATED( desc%nr2p_offset ) )   DEALLOCATE( desc%nr2p_offset )
@@ -305,6 +381,51 @@ CONTAINS
 
     IF ( ALLOCATED( desc%nl ) )  DEALLOCATE( desc%nl )
     IF ( ALLOCATED( desc%nlm ) ) DEALLOCATE( desc%nlm )
+
+#if defined(__CUDA)
+    IF ( ALLOCATED( desc%ismap_d ) )   DEALLOCATE( desc%ismap_d )
+    IF ( ALLOCATED( desc%ir1p_d ) )    DEALLOCATE( desc%ir1p_d )
+    IF ( ALLOCATED( desc%ir1w_d ) )    DEALLOCATE( desc%ir1w_d )
+    IF ( ALLOCATED( desc%ir1w_tg_d ) ) DEALLOCATE( desc%ir1w_tg_d )
+
+    IF ( ALLOCATED( desc%indp_d ) )   DEALLOCATE( desc%indp_d )
+    IF ( ALLOCATED( desc%indw_d ) )    DEALLOCATE( desc%indw_d )
+    IF ( ALLOCATED( desc%indw_tg_d ) ) DEALLOCATE( desc%indw_tg_d )
+
+    IF ( ALLOCATED( desc%nr1p_d ) )   DEALLOCATE( desc%nr1p_d )
+    IF ( ALLOCATED( desc%nr1w_d ) )    DEALLOCATE( desc%nr1w_d )
+    IF ( ALLOCATED( desc%nr1w_tg_d ) ) DEALLOCATE( desc%nr1w_tg_d )
+
+    IF (ALLOCATED(desc%stream_scatter_yz)) THEN
+        do iproc = 1, desc%nproc3
+            ierr = cudaStreamDestroy(desc%stream_scatter_yz(iproc))
+        end do
+        DEALLOCATE(desc%stream_scatter_yz)
+    END IF
+    IF (ALLOCATED(desc%stream_many)) THEN
+        do imany = 1, desc%nstream_many
+            ierr = cudaStreamDestroy(desc%stream_many(imany))
+        end do
+        DEALLOCATE(desc%stream_many)
+    END IF
+
+    IF ( ALLOCATED( desc%nl_d ) )  DEALLOCATE( desc%nl_d )
+    IF ( ALLOCATED( desc%nlm_d ) ) DEALLOCATE( desc%nlm_d )
+    !
+    ! SLAB decomposition
+    IF ( ALLOCATED( desc%srh ) )   DEALLOCATE( desc%srh )
+    ierr = cudaStreamDestroy( desc%a2a_comp )
+
+    nsubbatches = ceiling(real(desc%batchsize)/desc%subbatchsize)
+    DO i = 1, nsubbatches
+      ierr = cudaStreamDestroy( desc%bstreams(i) )
+      ierr = cudaEventDestroy( desc%bevents(i) )
+    ENDDO
+
+    DEALLOCATE( desc%bstreams )
+    DEALLOCATE( desc%bevents )
+
+#endif
 
     desc%comm  = MPI_COMM_NULL 
 #if defined(__MPI)
@@ -432,6 +553,10 @@ CONTAINS
 
     IF( size( desc%iplp ) < ( nr1x ) .or. size( desc%iplw ) < ( nr1x ) ) &
       CALL fftx_error__( ' fft_type_set ', ' wrong descriptor dimensions, ipl ', 5 )
+
+    IF( desc%my_nr3p == 0 .and. ( .not. desc%use_pencil_decomposition ) ) &
+      CALL fftx_error__( ' fft_type_set ', &
+                         ' there are processes with no planes. Use pencil decomposition (-pd .true.) ', 6 )
 
     !
     !  1. Temporarily store in the array "desc%isind" the index of the processor
@@ -725,13 +850,29 @@ CONTAINS
        desc%tg_rdsp(i) = desc%tg_rdsp(i-1) + desc%tg_rcv(i-1)
     ENDDO
 
+#if defined(__CUDA)
+    desc%ismap_d = desc%ismap
+    desc%ir1p_d = desc%ir1p
+    desc%ir1w_d = desc%ir1w
+    desc%ir1w_tg_d = desc%ir1w_tg
+
+    desc%indp_d = desc%indp
+    desc%indw_d = desc%indw
+    desc%indw_tg_d(:,1) = desc%indw_tg
+
+    desc%nr1p_d = desc%nr1p
+    desc%nr1w_d = desc%nr1w
+    desc%nr1w_tg_d(1) = desc%nr1w_tg
+
+#endif
+
     RETURN
 
   END SUBROUTINE fft_type_set
 
 !=----------------------------------------------------------------------------=!
 
-  SUBROUTINE fft_type_init( dfft, smap, pers, lgamma, lpara, comm, at, bg, gcut_in, dual_in, fft_fact, nyfft )
+  SUBROUTINE fft_type_init( dfft, smap, pers, lgamma, lpara, comm, at, bg, gcut_in, dual_in, fft_fact, nyfft, use_pd )
 
      USE stick_base
 
@@ -747,6 +888,7 @@ CONTAINS
      REAL(DP), OPTIONAL, INTENT(IN) :: dual_in
      INTEGER, INTENT(IN), OPTIONAL :: fft_fact(3)
      INTEGER, INTENT(IN) :: nyfft
+     LOGICAL, OPTIONAL, INTENT(IN) :: use_pd ! whether to use pencil decomposition
 !
 !    Potential or dual
 !
@@ -800,6 +942,9 @@ CONTAINS
         END IF
      END IF
 
+     IF ( PRESENT (use_pd) ) dfft%use_pencil_decomposition = use_pd
+     IF ( ( .not. dfft%use_pencil_decomposition ) .and. ( nyfft > 1 ) ) &
+        CALL fftx_error__(' fft_type_init ', ' Slab decomposition and task groups not implemented. ', 1 )
 
      dfft%lpara = lpara  !  this descriptor can be either a descriptor for a
                          !  parallel FFT or a serial FFT even in parallel build
@@ -837,7 +982,6 @@ CONTAINS
      IF( dfft%ngm /= ngm ) THEN
         CALL fftx_error__(' fft_type_init ', ' wrong ngm ', 1 )
      END IF
-
 
      DEALLOCATE( st )
      DEALLOCATE( stw )

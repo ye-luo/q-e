@@ -40,6 +40,7 @@ SUBROUTINE new_ns(ns)
   USE mp,                   ONLY : mp_sum, mp_bcast
   USE becmod,               ONLY : bec_type, calbec, &
                                    allocate_bec_type, deallocate_bec_type
+  USE wavefunctions_gpum, ONLY : using_evc
 
   IMPLICIT NONE
   !
@@ -52,6 +53,7 @@ SUBROUTINE new_ns(ns)
   !    "    "  spins
   REAL(DP) , ALLOCATABLE :: nr (:,:,:,:)
   REAL(DP) :: psum
+  CALL using_evc(0)
 
   CALL start_clock('new_ns')
   ldim = 2 * Hubbard_lmax + 1
@@ -71,6 +73,7 @@ SUBROUTINE new_ns(ns)
      npw = ngk (ik)
      IF (nks > 1) &
         CALL get_buffer  (evc, nwordwfc, iunwfc, ik)
+     IF (nks > 1) CALL using_evc(1)
      !
      ! make the projection
      !
@@ -217,6 +220,9 @@ SUBROUTINE new_ns(ns)
     USE uspp,                 ONLY : nkb, vkb, indv_ijkb0
     USE uspp_param,           ONLY : nhm, nh
     !
+    USE uspp_gpum,            ONLY : using_vkb, using_indv_ijkb0
+    USE becmod_subs_gpum,     ONLY : using_becp_auto
+    !
     IMPLICIT NONE
     REAL(DP), INTENT(IN) :: q(nwfcU,nhm,nat)
     TYPE(bec_type), INTENT(INOUT) :: p
@@ -225,10 +231,15 @@ SUBROUTINE new_ns(ns)
 
     IF ( nkb == 0 ) RETURN
     !
+    CALL using_indv_ijkb0(0)
+    !
     ! compute <beta|psi>
     !
     CALL allocate_bec_type (nkb, nbnd, becp)
+    CALL using_becp_auto(2)
+    CALL using_vkb(1)
     CALL init_us_2 (npw,igk_k(1,ik),xk(1,ik),vkb)
+    CALL using_evc(0)
     CALL calbec (npw, vkb, evc, becp)
     !
     IF ( gamma_only ) THEN 
@@ -237,6 +248,7 @@ SUBROUTINE new_ns(ns)
        p%k(:,:) = (0.0_DP,0.0_DP)
     ENDIF
     !
+    CALL using_becp_auto(0)
     DO nt = 1, ntyp
        !
        DO na = 1, nat
@@ -273,6 +285,7 @@ SUBROUTINE new_ns(ns)
     END DO
     !
     CALL deallocate_bec_type ( becp )
+    CALL using_becp_auto(2)
 
     RETURN
   END SUBROUTINE compute_pproj
@@ -305,6 +318,9 @@ SUBROUTINE new_ns_nc(ns)
   USE mp_pools,             ONLY : inter_pool_comm, intra_pool_comm, root_pool
   USE mp,                   ONLY : mp_sum, mp_bcast
 
+  USE wavefunctions_gpum, ONLY : using_evc
+  USE uspp_gpum,                 ONLY : using_vkb
+
   IMPLICIT NONE
   !
   ! I/O variables
@@ -333,11 +349,13 @@ SUBROUTINE new_ns_nc(ns)
 !--
 !    loop on k points
 !
+  CALL using_evc(0)
   DO ik = 1, nks
 
      npw = ngk (ik)
      IF (nks > 1) THEN
         CALL get_buffer  (evc, nwordwfc, iunwfc, ik)
+        CALL using_evc(1)
         CALL get_buffer (wfcU, nwordwfcU, iunhub, ik)
      END IF
      !

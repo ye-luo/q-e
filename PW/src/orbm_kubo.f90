@@ -52,6 +52,10 @@ SUBROUTINE orbm_kubo()
   USE gvecs,                ONLY : doublegrid
   USE mp_pools,             ONLY : intra_pool_comm
   USE mp_world,             ONLY : world_comm
+  !
+  USE scf_gpum,             ONLY : using_vrs
+  USE uspp_gpum,            ONLY : using_vkb
+  USE becmod_subs_gpum,     ONLY : using_becp_auto
 
   !  --- Avoid implicit definitions ---
   IMPLICIT NONE
@@ -117,8 +121,10 @@ SUBROUTINE orbm_kubo()
   ALLOCATE(H_evc(npol*npwx,nbnd))
   ALLOCATE(temp(ngm))
 
+  CALL using_vrs(1)
   CALL set_vrs( vrs, vltot, v%of_r, kedtau, v%kin_r, dfftp%nnr, nspin, doublegrid )
   CALL allocate_bec_type ( nkb, nbnd, becp )
+  CALL using_becp_auto(2)
   ! Initializations
 
   ! Define small number
@@ -172,6 +178,8 @@ SUBROUTINE orbm_kubo()
         ! needed by h_psi
         npw_k = ngk(n)
         current_k=n
+        !
+        CALL using_vkb(1)
         CALL init_us_2(npw_k,igk_k(1,n),xk(1,n),vkb)
         CALL g2_kin( n )
 
@@ -537,6 +545,7 @@ SUBROUTINE orbm_kubo()
 
   ! Deallocate arrays
   CALL deallocate_bec_type ( becp )
+  CALL using_becp_auto(2)
   DEALLOCATE(temp)
   DEALLOCATE(evc_k)
   DEALLOCATE(evc_kp)

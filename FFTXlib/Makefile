@@ -4,6 +4,9 @@ include ../make.inc
 
 FFTX = \
 scatter_mod.o  \
+scatter_mod_2d.o  \
+scatter_mod_gpu.o  \
+scatter_mod_2d_gpu.o  \
 fft_ggen.o  \
 fft_fwinv.o  \
 fft_scalar.o  \
@@ -11,10 +14,12 @@ fft_scalar.ARM_LIB.o  \
 fft_scalar.DFTI.o  \
 fft_scalar.ESSL.o  \
 fft_scalar.FFTW.o  \
+fft_scalar.cuFFT.o  \
 fftw_interfaces.o  \
 fft_scalar.FFTW3.o  \
 fft_scalar.SX6.o  \
 fft_parallel.o  \
+fft_parallel_2d.o  \
 fft_interfaces.o  \
 fft_interpolate.o \
 stick_base.o  \
@@ -26,7 +31,9 @@ fft_stick.o  \
 fft_types.o \
 tg_gather.o \
 fft_helper_subroutines.o \
-fft_param.o
+fft_param.o \
+fft_buffers.o \
+nvtx.o
 
 
 all : libqefft.a

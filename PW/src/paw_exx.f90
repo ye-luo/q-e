@@ -31,6 +31,9 @@ MODULE paw_exx
     USE paw_variables,  ONLY : okpaw
     USE uspp,           ONLY : indv_ijkb0
     USE io_global,      ONLY : ionode, ionode_id
+    !
+    USE uspp_gpum,           ONLY : using_indv_ijkb0
+    !
     IMPLICIT NONE
     !
     ! In input I get a slice of <beta|left> and <beta|right> only for this kpoint and this band
@@ -48,6 +51,8 @@ MODULE paw_exx
       CALL errore("PAW_newdxx", "you have to initialize paw paw_fockrnl before", 1)
     !
     CALL start_clock( 'PAW_newdxx' )
+    !
+    CALL using_indv_ijkb0(0)
     !
     ! Worst possible parallelisation:
     IF(ionode) THEN
@@ -100,6 +105,9 @@ MODULE paw_exx
     USE uspp_param,         ONLY : nh, upf
     USE uspp,               ONLY : nkb, indv_ijkb0
     USE io_global,          ONLY : ionode
+    !
+    USE uspp_gpum,           ONLY : using_indv_ijkb0
+    !
     IMPLICIT NONE
     COMPLEX(DP),INTENT(in) :: becphi(nkb), becpsi(nkb)
     !
@@ -112,6 +120,8 @@ MODULE paw_exx
         CALL errore("PAW_xx_energy", "you have to initialize paw paw_fockrnl before", 1)
     !
     CALL start_clock("PAW_xx_nrg")
+    CALL using_indv_ijkb0(0)
+    !
     PAW_xx_energy = 0._dp
     IF(ionode) THEN
     !

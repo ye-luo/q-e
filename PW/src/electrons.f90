@@ -53,6 +53,9 @@ SUBROUTINE electrons()
   USE loc_scdm,             ONLY : use_scdm, localize_orbitals
   USE loc_scdm_k,           ONLY : localize_orbitals_k
   !
+  USE wvfct_gpum,           ONLY : using_et, using_wg, using_wg_d
+  USE scf_gpum,             ONLY : using_vrs
+  !
   !
   IMPLICIT NONE
   !
@@ -114,6 +117,10 @@ SUBROUTINE electrons()
            READ (iunres, *) (wg(1:nbnd,ik),ik=1,nks)
            READ (iunres, *) (et(1:nbnd,ik),ik=1,nks)
            CLOSE ( unit=iunres, status='delete')
+           CALL using_et(2); CALL using_wg(2)
+#if defined(__CUDA)
+           CALL using_wg_d(0)
+#endif
            ! ... if restarting here, exx was already active
            ! ... initialize stuff for exx
            first = .false.
@@ -132,6 +139,7 @@ SUBROUTINE electrons()
            CALL v_of_rho( rho, rho_core, rhog_core, &
                ehart, etxc, vtxc, eth, etotefield, charge, v)
            IF (okpaw) CALL PAW_potential(rho%bec, ddd_PAW, epaw,etot_cmp_paw)
+           CALL using_vrs(1)
            CALL set_vrs( vrs, vltot, v%of_r, kedtau, v%kin_r, dfftp%nnr, &
                          nspin, doublegrid )
            !
@@ -158,6 +166,7 @@ SUBROUTINE electrons()
      IF ( stopped_by_user .OR. .NOT. conv_elec ) THEN
         conv_elec=.FALSE.
         IF ( .NOT. first) THEN
+           CALL using_et(0)
            WRITE(stdout,'(5x,"Calculation (EXX) stopped during iteration #", &
                         & i6)') iter
            CALL seqopn (iunres, 'restart_e', 'formatted', exst)
@@ -207,6 +216,7 @@ SUBROUTINE electrons()
         etot = etot + etxc + exxen
         !
         IF (okpaw) CALL PAW_potential(rho%bec, ddd_PAW, epaw,etot_cmp_paw)
+        CALL using_vrs(1)
         CALL set_vrs( vrs, vltot, v%of_r, kedtau, v%kin_r, dfftp%nnr, &
              nspin, doublegrid )
         !
@@ -305,6 +315,7 @@ SUBROUTINE electrons()
      WRITE( stdout,'(/5x,"EXX: now go back to refine exchange calculation")')
      !
      IF ( check_stop_now() ) THEN
+        CALL using_et(0)
         WRITE(stdout,'(5x,"Calculation (EXX) stopped after iteration #", &
                         & i6)') iter
         conv_elec=.FALSE.
@@ -380,7 +391,8 @@ SUBROUTINE electrons_scf ( printout, exxen )
                                    iprint, conv_elec, &
                                    restart, io_level, do_makov_payne,  &
                                    gamma_only, iverbosity, textfor,     &
-                                   llondon, ldftd3, scf_must_converge, lxdm, ts_vdw
+                                   llondon, ldftd3, scf_must_converge, lxdm, ts_vdw, &
+                                   use_gpu
   USE control_flags,        ONLY : n_scf_steps, scf_error
 
   USE io_files,             ONLY : iunmix, output_drho, &
@@ -410,11 +422,16 @@ SUBROUTINE electrons_scf ( printout, exxen )
   USE paw_onecenter,        ONLY : PAW_potential
   USE paw_symmetry,         ONLY : PAW_symmetrize_ddd
   USE dfunct,               ONLY : newd
+  USE dfunct_gpum,          ONLY : newd_gpu
   USE esm,                  ONLY : do_comp_esm, esm_printpot, esm_ewald
   USE fcp_variables,        ONLY : lfcpopt, lfcpdyn
   USE wrappers,             ONLY : memstat
   !
   USE plugin_variables,     ONLY : plugin_etot
+  !
+  USE wvfct_gpum,           ONLY : using_et
+  USE scf_gpum,             ONLY : using_vrs
+  USE gbuffers,             ONLY : dev_buf, pin_buf
   !
   IMPLICIT NONE
   !
@@ -459,6 +476,7 @@ SUBROUTINE electrons_scf ( printout, exxen )
   iter = 0
   dr2  = 0.0_dp
   IF ( restart ) CALL restart_in_electrons (iter, dr2, ethr, et )
+  IF ( restart ) CALL using_et(2)
   !
   WRITE( stdout, 9000 ) get_clock( 'PWSCF' )
   !
@@ -515,10 +533,14 @@ SUBROUTINE electrons_scf ( printout, exxen )
      !
      IF ( check_stop_now() ) THEN
         conv_elec=.FALSE.
+        CALL using_et(0)
         CALL save_in_electrons (iter, dr2, ethr, et )
         GO TO 10
      END IF
      iter = iter + 1
+     !
+     IF (use_gpu .and. (iverbosity >= 1) ) CALL dev_buf%print_report(stdout)
+     IF (use_gpu .and. (iverbosity >= 1) ) CALL pin_buf%print_report(stdout)
      !
      WRITE( stdout, 9010 ) iter, ecutwfc, mixing_beta
      !
@@ -568,6 +590,7 @@ SUBROUTINE electrons_scf ( printout, exxen )
         !
         IF ( stopped_by_user ) THEN
            conv_elec=.FALSE.
+           CALL using_et(0)
            CALL save_in_electrons (iter-1, dr2, ethr, et )
            GO TO 10
         END IF
@@ -578,13 +601,15 @@ SUBROUTINE electrons_scf ( printout, exxen )
         ! ... explicitely collected to the first node
         ! ... this is done here for et, in sum_band for wg
         !
+        CALL using_et(1)
         CALL poolrecover( et, nbnd, nkstot, nks )
         !
         ! ... the new density is computed here. For PAW:
         ! ... sum_band computes new becsum (stored in uspp modules)
         ! ... and a subtly different copy in rho%bec (scf module)
         !
-        CALL sum_band()
+        IF (.not. use_gpu) CALL sum_band()
+        IF (      use_gpu) CALL sum_band_gpu()
         !
         ! ... the Harris-Weinert-Foulkes energy is computed here using only
         ! ... quantities obtained from the input density
@@ -741,17 +766,20 @@ SUBROUTINE electrons_scf ( printout, exxen )
      !
      ! ... define the total local potential (external + scf)
      !
+     CALL using_vrs(1)
      CALL sum_vrs( dfftp%nnr, nspin, vltot, v%of_r, vrs )
      !
      ! ... interpolate the total local potential
      !
+     CALL using_vrs(1) ! redundant
      CALL interpolate_vrs( dfftp%nnr, nspin, doublegrid, kedtau, v%kin_r, vrs )
      !
      ! ... in the US case we have to recompute the self-consistent
      ! ... term in the nonlocal potential
      ! ... PAW: newd contains PAW updates of NL coefficients
      !
-     CALL newd()
+     IF (.not. use_gpu) CALL newd()
+     IF (      use_gpu) CALL newd_gpu()
      !
      IF ( lelfield ) en_el =  calc_pol ( )
      !
@@ -1341,7 +1369,8 @@ FUNCTION exxenergyace ( )
   USE mp_bands, ONLY : intra_bgrp_comm
   USE mp,       ONLY : mp_sum
   USE control_flags,        ONLY : gamma_only
-  USE wavefunctions, ONLY : evc
+  USE wavefunctions,        ONLY : evc
+  USE wavefunctions_gpum,   ONLY : using_evc
   !
   IMPLICIT NONE
   !
@@ -1352,11 +1381,13 @@ FUNCTION exxenergyace ( )
   !
   domat = .true.
   exxenergyace=0.0_dp
+  CALL using_evc(0)
   DO ik = 1, nks
      npw = ngk (ik)
      current_k = ik
      IF ( lsda ) current_spin = isk(ik)
      IF (nks > 1) CALL get_buffer(evc, nwordwfc, iunwfc, ik)
+     IF (nks > 1) CALL using_evc(2)
      IF (gamma_only) THEN
         call vexxace_gamma ( npw, nbnd, evc, ex )
      ELSE

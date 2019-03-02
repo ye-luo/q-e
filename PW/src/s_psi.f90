@@ -104,6 +104,7 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
   USE realus,     ONLY :  real_space, &
                   invfft_orbital_gamma, fwfft_orbital_gamma, calbec_rs_gamma, s_psir_gamma, &
                   invfft_orbital_k, fwfft_orbital_k, calbec_rs_k, s_psir_k
+  USE uspp_gpum,  ONLY : using_vkb, using_indv_ijkb0, using_qq_at, using_qq_so
   !
   IMPLICIT NONE
   !
@@ -176,6 +177,7 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
        ! ... gamma version
        !
        USE mp, ONLY: mp_get_comm_null, mp_circular_shift_left
+       USE becmod_gpum, ONLY : using_becp_r
        !
        IMPLICIT NONE  
        !
@@ -189,6 +191,10 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
          ! data distribution functions
        REAL(DP), ALLOCATABLE :: ps(:,:)
          ! the product vkb and psi
+       !
+       CALL using_indv_ijkb0(0)
+       CALL using_qq_at(0)
+       CALL using_becp_r(0)
        !
        IF( becp%comm == mp_get_comm_null() ) THEN
           nproc   = 1
@@ -236,6 +242,7 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
           END IF
        END DO
        !
+       CALL using_vkb(0)
        IF( becp%comm == mp_get_comm_null() ) THEN
           IF ( m == 1 ) THEN
              CALL DGEMV( 'N', 2 * n, nkb, 1.D0, vkb, &
@@ -285,6 +292,8 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
        !
        ! ... k-points version
        !
+       USE becmod_gpum, ONLY : using_becp_k
+       !
        IMPLICIT NONE
        !
        ! ... local variables
@@ -293,6 +302,10 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
          ! counters
        COMPLEX(DP), ALLOCATABLE :: ps(:,:), qqc(:,:)
          ! ps = product vkb and psi ; qqc = complex version of qq
+       !
+       CALL using_indv_ijkb0(0)
+       CALL using_qq_at(0)
+       CALL using_becp_k(0)
        !
        ALLOCATE( ps( nkb, m ), STAT=ierr )    
        IF( ierr /= 0 ) &
@@ -324,6 +337,7 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
           END IF
        END DO
        !
+       CALL using_vkb(0)
        IF ( m == 1 ) THEN
           !
           CALL ZGEMV( 'N', n, nkb, ( 1.D0, 0.D0 ), vkb, &
@@ -349,6 +363,8 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
        !
        ! ... k-points noncolinear/spinorbit version
        !
+       USE becmod_gpum,  ONLY : using_becp_nc
+       !
        IMPLICIT NONE
        !
        !    here the local variables
@@ -357,6 +373,11 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
        ! counters
        COMPLEX (DP), ALLOCATABLE :: ps (:,:,:)
        ! the product vkb and psi
+       !
+       CALL using_indv_ijkb0(0)
+       IF ( .NOT. lspinorb ) CALL using_qq_at(0)
+       IF (lspinorb)         CALL using_qq_so(0)
+       CALL using_becp_nc(0)
        !
        ALLOCATE (ps(nkb,npol,m),STAT=ierr)    
        IF( ierr /= 0 ) &
@@ -396,6 +417,8 @@ SUBROUTINE s_psi_( lda, n, m, psi, spsi )
              END DO
           END IF
        END DO
+
+       CALL using_vkb(0)
 
        call ZGEMM ('N', 'N', n, m*npol, nkb, (1.d0, 0.d0) , vkb, &
           lda, ps, nkb, (1.d0, 0.d0) , spsi(1,1), lda)

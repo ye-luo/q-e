@@ -10,6 +10,8 @@ cegterg.o \
 regterg.o \
 david_param.o
 
+-include make.gpu
+
 all : libdavid.a
 
 
