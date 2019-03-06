@@ -430,7 +430,7 @@ SUBROUTINE stres_us( ik, gk, sigmanlc )
              work2 = (0.D0,0.D0)
              CALL compute_deff(deff,et(ibnd,ik))
           ENDIF
-          !$omp parallel private(ijkb0, ikb, ijs, ps_nc, ps, jkb)
+          !!omp parallel private(ijkb0, ikb, ijs, ps_nc, ps, jkb)
           ijkb0 = 0
           DO np = 1, ntyp
              DO na = 1, nat
@@ -477,25 +477,25 @@ SUBROUTINE stres_us( ik, gk, sigmanlc )
                       END IF
                       IF (noncolin) THEN
                          DO is=1,npol
-                            !$omp do
+                            !!omp do
                             DO ipw = 1, npw
                                work2_nc(ipw,is) = ps_nc(is) * dvkb(ipw, ikb) + work2_nc(ipw,is)
                             END DO
-                            !$omp end do nowait
+                            !!omp end do nowait
                          END DO
                       ELSE
-                         !$omp do
+                         !!omp do
                          DO ipw = 1, npw
                             work2(ipw) = ps * dvkb(ipw, ikb) + work2(ipw)
                          END DO
-                         !$omp end do nowait
+                         !!omp end do nowait
                       END IF
                    END DO
                    ijkb0 = ijkb0 + nh(np)
                 END IF
              END DO
           END DO
-          !$omp end parallel
+          !!omp end parallel
           DO ipol = 1, 3
              DO jpol = 1, ipol
                 IF (noncolin) THEN
@@ -536,7 +536,7 @@ SUBROUTINE stres_us( ik, gk, sigmanlc )
                 work2 = (0.D0,0.D0)
                 CALL compute_deff(deff,et(ibnd,ik))
              ENDIF
-             !$omp parallel private(ijkb0, ikb, ijs, ps_nc, ps, jkb)
+             !!omp parallel private(ijkb0, ikb, ijs, ps_nc, ps, jkb)
              ijkb0 = 0
              DO np = 1, ntyp
                 DO na = 1, nat
@@ -583,25 +583,25 @@ SUBROUTINE stres_us( ik, gk, sigmanlc )
                          END IF
                          IF (noncolin) THEN
                             DO is=1,npol
-                               !$omp do
+                               !!omp do
                                DO ipw = 1, npw
                                   work2_nc(ipw,is) = ps_nc(is) * dvkb(ipw, ikb) + work2_nc(ipw,is)
                                END DO
-                               !$omp end do nowait
+                               !!omp end do nowait
                             END DO
                          ELSE
-                            !$omp do
+                            !!omp do
                             DO ipw = 1, npw
                                work2(ipw) = ps * dvkb(ipw, ikb) + work2(ipw)
                             END DO
-                            !$omp end do nowait
+                            !!omp end do nowait
                          END IF
                       END DO
                       ijkb0 = ijkb0 + nh(np)
                    END IF
                 END DO
              END DO
-             !$omp end parallel
+             !!omp end parallel
              DO jpol = 1, ipol
                 IF (noncolin) THEN
                    DO i = 1, npw
