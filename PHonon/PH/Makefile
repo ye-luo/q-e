@@ -44,7 +44,7 @@ compute_weight.o \
 deallocate_part.o \
 deallocate_phq.o \
 d2ionq.o \
-d2ionq_mm.o \
+d2ionq_disp.o \
 d2nsq_bare.o \
 dnsq_bare.o \
 dnsq_orth.o \
@@ -168,7 +168,7 @@ write_modes.o \
 write_rec.o \
 write_hub.o \
 zstar_eu.o \
-zstar_eu_us.o 
+zstar_eu_us.o
 
 RAMANOBJS =    \
 psyme2.o   \
@@ -195,7 +195,7 @@ write_eigenvectors.o
 LRMODS = ../../LR_Modules/liblrmod.a
 PWOBJS = ../../PW/src/libpw.a
 QEMODS = ../../Modules/libqemod.a ../../KS_Solvers/libks_solvers.a \
-         ../../FFTXlib/libqefft.a ../../LAXlib/libqela.a ../../UtilXlib/libutil.a ../../dft-d3/libdftd3qe.a
+         ../../FFTXlib/libqefft.a ../../LAXlib/libqela.a ../../GScratch/libgscratch.a ../../UtilXlib/libutil.a ../../dft-d3/libdftd3qe.a
 
 TLDEPS= phlibs
 
@@ -204,38 +204,38 @@ all : tldeps libs-ph ph.x dynmat.x matdyn.x q2r.x q2trans.x q2trans_fd.x lambda.
 
 libs-ph : libph.a libphaux.a
 
-ph.x : phonon.o libph.a $(PWOBJS) $(LRMODS) $(LIBOBJS)
+ph.x : phonon.o libph.a $(PWOBJS) $(LRMODS) $(QEMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ phonon.o libph.a \
 		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(QELIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/ph.x . )
 
-dynmat.x : dynmat.o libphaux.a  libph.a $(PWOBJS) $(LRMODS) $(MODULES) $(LIBOBJS)
+dynmat.x : dynmat.o libphaux.a  libph.a $(PWOBJS) $(LRMODS) $(QEMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ dynmat.o libphaux.a libph.a \
 		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(QELIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
 
-matdyn.x : matdyn.o libphaux.a libph.a $(PWOBJS) $(LRMODS) $(MODULES) $(LIBOBJS)
+matdyn.x : matdyn.o libphaux.a libph.a $(PWOBJS) $(LRMODS) $(QEMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ matdyn.o libphaux.a libph.a \
 		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(QELIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
 
-q2r.x : q2r.o libphaux.a libph.a $(PWOBJS) $(LRMODS) $(MODULES) $(LIBOBJS)
+q2r.x : q2r.o libphaux.a libph.a $(PWOBJS) $(LRMODS) $(QEMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ q2r.o libphaux.a libph.a \
 		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(QELIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
 
 
-q2trans.x : q2trans.o libphaux.a libph.a $(PWOBJS) $(LRMODS) $(MODULES) $(LIBOBJS)
+q2trans.x : q2trans.o libphaux.a libph.a $(PWOBJS) $(LRMODS) $(QEMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ q2trans.o libphaux.a libph.a \
 		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(QELIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
 
-q2trans_fd.x : q2trans_fd.o libphaux.a libph.a $(PWOBJS) $(LRMODS) $(MODULES) $(LIBOBJS)
+q2trans_fd.x : q2trans_fd.o libphaux.a libph.a $(PWOBJS) $(LRMODS) $(QEMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ q2trans_fd.o libphaux.a libph.a \
 		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(QELIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
 
-q2qstar.x : q2qstar.o libph.a $(PWOBJS) $(LRMODS) $(MODULES) $(LIBOBJS)
+q2qstar.x : q2qstar.o libph.a $(PWOBJS) $(LRMODS) $(QEMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ q2qstar.o libph.a \
 		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(QELIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
@@ -267,7 +267,7 @@ tldeps :
 	if test -n "$(TLDEPS)" ; then \
 	( cd ../.. ; $(MAKE) $(TLDEPS) || exit 1 ) ; fi
 
-libph.a : $(PHOBJS) $(RAMANOBJS) 
+libph.a : $(PHOBJS) $(RAMANOBJS)
 	$(AR) $(ARFLAGS) $@ $?
 	$(RANLIB) $@
 

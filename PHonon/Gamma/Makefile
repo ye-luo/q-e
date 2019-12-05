@@ -12,7 +12,6 @@ CGOBJS = \
 a_h.o \
 cg_readin.o \
 cg_setup.o \
-cg_setupdgc.o \
 cgcom.o \
 cgsolve.o \
 d2ion.o \
@@ -33,11 +32,11 @@ macro.o \
 rhod2vkb.o \
 solve_e.o \
 solve_ph.o \
-writedyn.o 
+writedyn.o
 
 PWOBJS = ../../PW/src/libpw.a
 QEMODS = ../../Modules/libqemod.a ../../KS_Solvers/libks_solvers.a \
-         ../../FFTXlib/libqefft.a ../../LAXlib/libqela.a ../../UtilXlib/libutil.a ../../dft-d3/libdftd3qe.a
+         ../../FFTXlib/libqefft.a ../../LAXlib/libqela.a ../../GScratch/libgscratch.a ../../UtilXlib/libutil.a ../../dft-d3/libdftd3qe.a ../../LR_Modules/liblrmod.a
 
 TLDEPS= pwlibs
 

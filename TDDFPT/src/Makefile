@@ -10,7 +10,7 @@ MODFLAGS= $(BASEMOD_FLAGS) \
 
 QEMODS = ../../Modules/libqemod.a ../../FFTXlib/libqefft.a \
          ../../KS_Solvers/libks_solvers.a \
-         ../../LAXlib/libqela.a ../../UtilXlib/libutil.a ../../dft-d3/libdftd3qe.a
+         ../../LAXlib/libqela.a ../../GScratch/libgscratch.a ../../UtilXlib/libutil.a ../../dft-d3/libdftd3qe.a
 PWOBJS = ../../PW/src/libpw.a
 LRMODS = ../../LR_Modules/liblrmod.a
 
@@ -21,7 +21,6 @@ bcast_lr_input.o \
 lr_readin.o \
 lr_alloc_init.o \
 lr_calc_dens.o \
-lr_dot.o \
 lr_dealloc.o \
 lr_ortho.o \
 lr_read_wf.o \
@@ -29,6 +28,10 @@ lr_normalise.o \
 lr_lanczos.o \
 lr_apply_liouvillian.o \
 lr_dv_setup.o \
+lr_compute_intq.o \
+lr_set_intq_nc.o \
+lr_transform_intq_nc.o \
+lr_transform_intq_so.o  \
 lr_solve_e.o \
 lr_dvpsi_e.o \
 stop_lr.o \
@@ -58,11 +61,11 @@ lr_test_restart.o\
 lr_dav_debug.o\
 plugin_tddfpt_potential.o
 
-TLDEPS=phlibs
+TLDEPS=lrmods
 
 all : tldeps libtddfpt.a turbo_lanczos.x turbo_davidson.x turbo_eels.x
 
-libtddfpt.a : $(LROBJS) 
+libtddfpt.a : $(LROBJS)
 	$(AR) $(ARFLAGS) $@ $?
 	$(RANLIB) $@
 
