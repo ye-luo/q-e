@@ -33,7 +33,6 @@ module tb_dev
 
 !> The main **fbuf** class.
   type :: tb_dev_t
-     integer :: nbufs = 10
      logical :: verbose = .false.
      !
    contains
@@ -41,6 +40,8 @@ module tb_dev
      final :: clean
 
      procedure :: reinit
+     procedure :: dealloc
+
      generic, public :: lock_buffer => &
                         lock_buffer_iv, &           !< Releases a integer vector buffer
                         lock_buffer_im, &           !< Releases a integer matrix buffer
@@ -133,17 +134,15 @@ module tb_dev
   
 contains
   !> Initialize the class selecting the device type.
-  subroutine init(this, n, info, verbose)
+  subroutine init(this, info, verbose)
     use iso_c_binding
     implicit none
     class(tb_dev_t),  intent(inout) :: this     !< The class.
-    integer,       intent(in)  :: n       !< Wether device can be the host itself
     integer,       intent(out) :: info    !< Error reporting.
                                           !<  0: ok
                                           !< -1: generic error
     logical, optional, intent(in) :: verbose
     !
-    this%nbufs = n
     this%verbose = .false.
     if (present(verbose)) this%verbose = verbose
 
@@ -154,9 +153,15 @@ contains
   end subroutine init
   !
   subroutine clean(this)
-    use iso_c_binding
     implicit none
     type(tb_dev_t) :: this     !< The class.
+    call this%dealloc()
+  end subroutine clean
+  !
+  subroutine dealloc(this)
+    use iso_c_binding
+    implicit none
+    class(tb_dev_t) :: this     !< The class.
     integer :: i, info
     TYPE(Node), POINTER  :: temp
     i = 0
@@ -175,30 +180,30 @@ contains
     END DO
     NULLIFY (Head)
     if (this%verbose) write (*, '("[tb_dev] Cleaned ", I2, " buffers")') i
-  end subroutine clean
+  end subroutine dealloc
   !
-  subroutine reinit(this)
+  subroutine reinit(this, info)
     use iso_c_binding
     implicit none
     class(tb_dev_t), intent(inout)  :: this     !< The class.
-    integer :: i, info
+    integer, intent(out) :: info !< 0 -> ok ; -n -> failed, n buffers still allocated
+    integer :: l
     TYPE(Node), POINTER  :: temp
-    i = 0
-    DO WHILE (ASSOCIATED(head))
-#if defined (__CUDA)
 
-        IF ( ASSOCIATED(head%space) ) DEALLOCATE(head%space)
-
-#else
-        IF ( ASSOCIATED(head%space) ) DEALLOCATE(head%space)
-#endif
-        temp => head
-        head => head%next
-        DEALLOCATE(temp)
-        i = i + 1
+    temp => Head
+    l = 0
+    DO WHILE (ASSOCIATED(temp))
+        if (temp%locked) l = l + 1
+        temp => temp%Next
     END DO
-    NULLIFY (Head)
-    if (this%verbose) write (*, '("[tb_dev] Cleaned ", I2, " buffers")') i
+    IF ( l > 0 ) THEN
+        info = -l
+        return
+    ELSE
+        CALL this%dealloc()
+        info = 0
+    END IF
+    !
   end subroutine reinit
   !
   subroutine dump_status(this)
@@ -1548,7 +1553,6 @@ module tb_pin
 
 !> The main **fbuf** class.
   type :: tb_pin_t
-     integer :: nbufs = 10
      logical :: verbose = .false.
      !
    contains
@@ -1556,6 +1560,8 @@ module tb_pin
      final :: clean
 
      procedure :: reinit
+     procedure :: dealloc
+
      generic, public :: lock_buffer => &
                         lock_buffer_iv, &           !< Releases a integer vector buffer
                         lock_buffer_im, &           !< Releases a integer matrix buffer
@@ -1648,17 +1654,15 @@ module tb_pin
   
 contains
   !> Initialize the class selecting the device type.
-  subroutine init(this, n, info, verbose)
+  subroutine init(this, info, verbose)
     use iso_c_binding
     implicit none
     class(tb_pin_t),  intent(inout) :: this     !< The class.
-    integer,       intent(in)  :: n       !< Wether device can be the host itself
     integer,       intent(out) :: info    !< Error reporting.
                                           !<  0: ok
                                           !< -1: generic error
     logical, optional, intent(in) :: verbose
     !
-    this%nbufs = n
     this%verbose = .false.
     if (present(verbose)) this%verbose = verbose
 
@@ -1669,9 +1673,15 @@ contains
   end subroutine init
   !
   subroutine clean(this)
-    use iso_c_binding
     implicit none
     type(tb_pin_t) :: this     !< The class.
+    call this%dealloc()
+  end subroutine clean
+  !
+  subroutine dealloc(this)
+    use iso_c_binding
+    implicit none
+    class(tb_pin_t) :: this     !< The class.
     integer :: i, info
     TYPE(Node), POINTER  :: temp
     i = 0
@@ -1690,30 +1700,30 @@ contains
     END DO
     NULLIFY (Head)
     if (this%verbose) write (*, '("[tb_pin] Cleaned ", I2, " buffers")') i
-  end subroutine clean
+  end subroutine dealloc
   !
-  subroutine reinit(this)
+  subroutine reinit(this, info)
     use iso_c_binding
     implicit none
     class(tb_pin_t), intent(inout)  :: this     !< The class.
-    integer :: i, info
+    integer, intent(out) :: info !< 0 -> ok ; -n -> failed, n buffers still allocated
+    integer :: l
     TYPE(Node), POINTER  :: temp
-    i = 0
-    DO WHILE (ASSOCIATED(head))
-#if defined (__CUDA)
 
-        IF ( ASSOCIATED(head%space) ) info = cudaFreeHost(c_loc(head%space))
-
-#else
-        IF ( ASSOCIATED(head%space) ) DEALLOCATE(head%space)
-#endif
-        temp => head
-        head => head%next
-        DEALLOCATE(temp)
-        i = i + 1
+    temp => Head
+    l = 0
+    DO WHILE (ASSOCIATED(temp))
+        if (temp%locked) l = l + 1
+        temp => temp%Next
     END DO
-    NULLIFY (Head)
-    if (this%verbose) write (*, '("[tb_pin] Cleaned ", I2, " buffers")') i
+    IF ( l > 0 ) THEN
+        info = -l
+        return
+    ELSE
+        CALL this%dealloc()
+        info = 0
+    END IF
+    !
   end subroutine reinit
   !
   subroutine dump_status(this)
