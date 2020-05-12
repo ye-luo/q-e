@@ -1,5 +1,5 @@
 \documentclass[12pt,a4paper]{article}
-\def\version{6.5MaX}
+\def\version{6.5+}
 \def\qe{{\sc Quantum ESPRESSO}}
 
 \usepackage{html}
@@ -304,14 +304,19 @@ or the file License in the distribution).
 \label{SubSec:Download}
 
 \qe\ is distributed in source form, but selected binary packages
-are also available.
+and virtual machines are also available.
 Stable and development releases of the \qe\ source package
 (current version is \version), as well as available binary
 packages, can be downloaded from the links listed in the
 ``Download'' section of \texttt{www.quantum-espresso.org}.
 
-Uncompress and unpack compressed archives in the typical .tar.gz
-format using the command:
+The Quantum Mobile virtual machine for Windows/Mac/Linux/Solaris
+provides a complete Ubuntu Linux environment, containing \qe\ and
+more. Link and description in
+\texttt{https://www.materialscloud.org/work/quantum-mobile}.
+
+For source compilation, uncompress and unpack compressed archives
+in the typical .tar.gz format using the command:
 \begin{verbatim}
      tar zxvf qe-X.Y.Z.tar.gz
 \end{verbatim}
@@ -323,7 +328,7 @@ doesn't recognize the "z" flag:
 \end{verbatim}
 A directory \texttt{qe-X.Y.Z/} will be created.
 
-Additional packages that are not included in the base distribution
+A few additional packages that are not included in the base distribution
 will be downloaded on demand at compile time, using \texttt{make}
 (see Sec.\ref{SubSec:Compilation}).
 Note however that this will work only if the computer you are
@@ -359,6 +364,7 @@ common to all packages:
 
 \begin{tabular}{ll}
 \texttt{Modules/} &  Fortran modules and utilities used by all programs\\
+\texttt{upflib/}  &  pseudopotential-related code, plus conversion tools\\
 \texttt{include/} &  files *.h included by fortran and C source files\\
 \texttt{clib/}    &  libraries and utilities written in C\\
 \texttt{FFTXlib/} &  FFT libraries\\
@@ -367,7 +373,6 @@ common to all packages:
 \texttt{UtilXlib/}&  Miscellaneous timing, error handling, MPI utilites\\
 \texttt{install/} &  installation scripts and utilities\\
 \texttt{pseudo}/  &  pseudopotential files used by examples\\
-\texttt{upftools/}&  converters to unified pseudopotential format (UPF)\\
 \texttt{Doc/}     &  general documentation\\
 \texttt{archive/} &  external libraries in .tar.gz form\\
 \texttt{test-suite/} &  automated tests\\
@@ -545,26 +550,27 @@ tested, but we had at least one successful report (compilation
 for NEC SX6 on a PC). Currently supported architectures are:
 
 \begin{tabular}{ll}
-\texttt{ia32}&    Intel 32-bit machines (x86) running Linux\\
-\texttt{ia64}&    Intel 64-bit (Itanium) running Linux\\
-\texttt{x86\_64}&  Intel and AMD 64-bit running Linux - see note below\\
-\texttt{crayxt4}& Cray XT4/XT5/XE machines\\
-\texttt{mac686}&  Apple Intel machines running Mac OS X\\
-\texttt{cygwin}&  MS-Windows PCs with Cygwin\\
-\texttt{mingw32}& Cross-compilation for MS-Windows, using mingw, 32 bits\\
-\texttt{mingw64}& As above, 64 bits\\
-\texttt{necsx}&   NEC SX-6 and SX-8 machines\\
-\texttt{ppc64}&   Linux PowerPC machines, 64 bits\\
-\texttt{ppc64-mn}&as above, with IBM xlf compiler\\
-\texttt{ppc64-bg}&IBM BlueGene\\
-\texttt{arm}     &ARM machines (with gfortran)
+\texttt{x86\_64}   & Intel and AMD 64-bit running Linux\\
+\texttt{arm}       & ARM machines (with gfortran or armflang)
+\texttt{crayxt4}   & Cray XT4/XT5/XE machines\\
+\texttt{mac686}    & Apple Intel machines running Mac OS X\\
+\texttt{mingw32}   & Cross-compilation for MS-Windows, using mingw, 32 bits\\
+\texttt{mingw64}   & As above, 64 bits\\
+\texttt{cygwin}    &  MS-Windows PCs with Cygwin\\
+\texttt{ppc64}     & Linux PowerPC machines, 64 bits\\
+\texttt{ppc64-mn}  & as above, with IBM xlf compiler\\
+\texttt{ppc64-bg*} & IBM BlueGene\\
+\texttt{necsx*}    & NEC SX-6 and SX-8 machines\\
+\texttt{ia32*}     & Intel 32-bit machines (x86) running Linux\\
+\texttt{ia64*}     & Intel 64-bit (Itanium) running Linux
 \end{tabular}\\
 {\em Note}: \texttt{x86\_64} replaces \texttt{amd64} since v.4.1.
-Cray Unicos machines, SGI
-machines with MIPS architecture, HP-Compaq Alphas are no longer supported
-since v.4.2; PowerPC Macs are no longer
-supported since v.5.0. IBM machines with AIX are no longer supported
-since v.6.0.
+Cray Unicos machines, SGI machines with MIPS architecture, HP-Compaq Alphas
+are no longer supported since v.4.2; PowerPC Macs are no longer
+supported since v.5.0; IBM machines with AIX are no longer supported
+since v.6.0. Architectures marked with a * are to be considered obsolescent
+or obsolete.
+
 Finally, \configure\ recognizes the following command-line options:\\
 \begin{tabular}{ll}
 \texttt{--enable-parallel}&     compile for parallel (MPI) execution if possible (default: yes)\\
@@ -572,13 +578,12 @@ Finally, \configure\ recognizes the following command-line options:\\
 \texttt{--enable-shared}&       use shared libraries if available (default: yes;\\
                         &       "no" is implemented, untested, in only a few cases)\\
 \texttt{--enable-debug}&        compile with debug flags (only for selected cases; default: no)\\
+\texttt{--enable-pedantic}&     compile with pedantic flags (only for gfortran; default: no)\\
 \texttt{--enable-signals}&      enable signal trapping (default: disabled)\\
 \end{tabular}\\
 \\
 and the following optional packages:\\
 \begin{tabular}{ll}
-\texttt{--with-internal-blas}&    compile with internal BLAS (default: no)\\
-\texttt{--with-internal-lapack}&  compile with internal LAPACK (default: no)\\
 \texttt{--with-scalapack}&        (yes$|$no$|$intel) Use scalapack if available. \\
       &Set to \texttt{intel} to use Intel MPI and blacs (default: use OpenMPI)\\
 \texttt{--with-elpa-include}&   Specify full path of ELPA include and modules
@@ -587,8 +592,20 @@ and the following optional packages:\\
 	                          (default: no)\\
 \texttt{--with-elpa-version}& Specify ELPA version, only year (2015 or 2016,
 	                          default: 2016)\\
-\texttt{--with-hdf5}&  (no $|$ \texttt{<path>}) Write portable binary files using HDF5.\\
-   & A valid \texttt{<path>} for HDF5 library must be specified (default: no)\\
+\texttt{--with-hdf5}&  (no $|$ $|$ yes $|$ \texttt{<path>}) \\
+	                    & Use HDF5, if yes configure assumes    \\
+                            & that a valid installation with version >= 1.8.16 is \\
+                            & available, and h5cc and h5fc are in the default   \\ 
+                            & executable search path; <path> must be the root   \\ 
+                            & folder of a standalone hdf5 installation. (default: no). \\
+\texttt{--with-hdf5-libs=}  & Specify the linker options needed by HDF5 when  \\
+                            & configure fails to detect them by itself. As value \\ 
+                            & to specify here is usually composed by many \\ 
+                            & substrings it should be enclosed by quotes so to \\
+                            & prevent configure failures. (default: no)   \\
+\texttt{--with-hdf5-include}& Specify full path the HDF5 include folder containing \\
+                            & module and headers files. Use it if configure fails \\ 
+                            & to detect the path by itself. (default: no)\\ 
 \texttt{--with-libxc}        & Link the \libxc\ library (default:no) \\
 \texttt{--with-libxc-prefix} & directory where \libxc\ is installed \\
 \texttt{--with-libxc-include}& directory where \libxc\ Fortran headers reside\\
@@ -615,8 +632,8 @@ The following options are available for the CUDA Fortran accelerated version
 \end{tabular}\\
 
 Please note that in order to compile the CUDA Fortran code you need ...
-the CUDA Fortran code (it is not yet available in the main distribution)! 
-you also need a recent version of the PGI Fortran compilers (at least 17.4).
+the CUDA Fortran code (it is still separated from the main distribution)! 
+you also need a recent version of the PGI Fortran compiler.
 OpenMP must be enabled,
 and you may want to use a CUDA-aware MPI distribution to optimize the data
 transfer between the processes.
@@ -725,26 +742,26 @@ developed for \qe{} by NVidia and distributed at \texttt{https://github.com/NVID
 The HDF5 library (\texttt{https://www.hdfgroup.org/downloads/hdf5/})
 can be used to perform binary I/O using the  HDF5 format.  
 
-The user may need to install this library, compiling it
-with options \texttt{--enable-fortran}, \texttt{--enable-fortran2003},
+The user may need to install \texttt{HDF5}  library, in this case have care to compile it
+with the options \texttt{--enable-fortran}, \texttt{--enable-fortran2003},
 and \texttt{--enable-parallel} (see below). These options must be passed
 to the \configure\ script of the library, not of \qe. 
 
 One can use either the \texttt{1.10} or \texttt{1.8} version of the library. 
-For the latter the user has to download a version at least as new as \texttt{1.8.16}.    
+For the latter the user has to download a version at least as new as \texttt{1.8.16}.  
 
-The path to the root directory of the library (the one containing \texttt{bin/},
-\texttt{include/} and \texttt{lib/} directories) has to be passed to the
-\configure\ script of \qe\ via the \texttt{--with-hdf5=...} option.
+To use the \texttt{HDF5} is usually sufficient to specify the path to the fortran compiler wrapper for
+ \texttt{HDF5} (\texttt{h5fc} of \texttt{h5pfc} with the \texttt{--with-hdf5=} option of configure. If the wrapper is in the default path just use \texttt{--with-hdf5=yes}.  
+ The configure script is usually able to extract the 
+ linker options and the include directory path from the output of the wrapper. If it fails the user can
+ use configure options \texttt{--with-hdf5-libs=<options>} and \texttt{--with-hdf5-include=<path>} for the linker options and include path respectively. 
+These two latter options are often  needed when using the HDF5 packages 
+provided by many LINUX distributions. In this case you may first try  first the \texttt{--with-hdf5=yes} 
+option. If if it fails just type the command  \texttt{h5fc --show} ( or \texttt{h5pfc} if you are using paralel HDF5), the command will printout the linker and include options to be passed manually to the configure script.
 
-It is possible to use a library with disabled parallelism, 
-but one has to add manually the flag \texttt{-D\_\_HDF5\_SERIAL}
-to the \texttt{MANUAL\_DFLAGS} in the \texttt{make.inc} file. 
+The configure script is able to determine whether one is linking to a serial or parallel HDF5 library, and will  set the flag \texttt{-D\_\_HDF5\_SERIAL} in the \texttt{make.inc} accordingly. 
 
-The HDF5 packages provided by many LINUX distributions may also work,
-but the configure script fails if includes and libraries are not placed
-under the same root directory. In this case the user should manually set
-the correct paths in the \texttt{make.inc} file.
+
 
 \paragraph{LIBXC}
 \qe\ can use the \libxc\ library. You need to install \libxc\ first, then:
@@ -819,8 +836,6 @@ At your choice, you may compile the complete \qe\ suite of programs
 \item \texttt{make xspectra} compiles the package \texttt{XSpectra}.
 			All executables are linked
 			in main \texttt{bin} directory
-\item \texttt{make upf} produces utilities for pseudopotential conversion in
-                        directory \texttt{upftools/}
 \item \texttt{make all} produces all of the above
 \item \texttt{make epw} compiles package \texttt{EPW}
 \item \texttt{make plumed} unpacks \texttt{PLUMED}, patches several routines
@@ -983,75 +998,24 @@ Note that \qe\ is self-contained (with the exception of MPI libraries for
 parallel compilation): if system libraries are missing, the problem is in
 your compiler/library combination or in their usage, not in \qe.
 \item
-  If you get mysterious {\em Segmentation fault} and the like errors
-  in the provided tests and examples:
-your compiler, or your mathematical libraries, or MPI libraries,
-or a combination thereof, is very likely buggy, or there is some
-form of incompatibility (see below). Although one can never rule out
+If you get {\em Segmentation fault} or similar errors
+in the provided tests and examples: your compiler, or
+your mathematical libraries, or MPI libraries,
+or a combination thereof, is buggy, or there is some
+software incompatibility. Although one can never rule out
 the presence of subtle bugs in \qe\ that are not revealed during
 the testing phase, it is very unlikely
 that this happens on the provided tests and examples.
+\item
+If all test fails, look into the output and error files:
+there is some dumb reason for failure.
+\item
+If most test pass but some fail, again: look into the output
+and error files. A frequent source of trouble is complex function 
+\texttt{zdotc}. See the "Linux PCs with gfortran compilers" paragraph, 
+or replace \texttt{zdotc} with fortran intrinsic \texttt{dot\_product}.
 \end{itemize}
 
-\subsubsection{Intel Xeon Phi}
-For Intel Xeon CPUs with Phi coprocessor, there are three ways of compiling:
-\begin{itemize}
-\item {\em offload} mode, executed on main CPU and offloaded onto coprocessor
-"automagically";
-\item {\em native} mode, executed completely on coprocessor;
-\item {\em symmetric} mode, requiring creation of both binaries.
-\end{itemize}
-"You can take advantage of the offload mode using the \texttt{libxphi}
-library. This library offloads the BLAS/MKL functions on the Xeon Phi
-platform hiding the latency times due to the communication. You just
-need to compile this library and then to link it dynamically. The
-library works with any version of QE. Libxphi is available from
-\texttt{https://github.com/cdahnken/libxphi}. Some documentation is
-available therein.
-
-Instead, if you want to compile a native version of QE, you just need
-to add the \texttt{-mmic} flag and cross compile. If you want to use
-the symmetric mode, you need to compile twice: with and without the
-\texttt{-mmic} flag". "[...] everything, i.e. code+libraries, must be
-cross-compiled with the \texttt{-mmic} flag. In my opinion, it's pretty
-unlikely that native mode can outperform the execution on the standard
-Xeon cpu. I strongly suggest to use the Xeon Phi in offload mode, for now"
-(info by Fabio Affinito, March 2015).
-
-\subsubsection{Cray machines}
-
-(This section is likely obsolete)
-
-For Cray XE machines:
-\begin{verbatim}
-$ module swap PrgEnv-cray PrgEnv-pgi
-$ ./configure --enable-openmp --enable-parallel --with-scalapack
-$ vim make.inc
-\end{verbatim}
-then manually add \texttt{-D\_\_IOTK\_WORKAROUND1} at the end of \texttt{DFLAGS} line.
-
-''Now, despite what people can imagine, every CRAY machine deployed can
-have different environment. For example on the machine I usually use
-for tests [...] I do have to unload some modules to make QE running
-properly. On another CRAY [...] there is also Intel compiler as option
-and the system is slightly different compared to the other.
-So my recipe should work, 99\% of the cases.'' (info by Filippo Spiga)
-
-For Cray XT machines, use \texttt{./configure ARCH=crayxt4} or else
-\configure\ will not recognize the Cray-specific software environment.
-
-Older Cray machines: T3D, T3E, X1, are no longer supported.
-
-\subsubsection{IBM BlueGene}
-
-The current \configure\ was working on the machines at CINECA and at J\"ulich.
-For other machines, you may need something like
-\begin{verbatim}
-  ./configure ARCH=ppc64-bg BLAS_LIBS=...  LAPACK_LIBS=... \
-              SCALAPACK_DIR=... BLACS_DIR=..."
-\end{verbatim}
-where the various *\_LIBS and *\_DIR "suggest" where the various libraries
-are located.
 
 \subsubsection{Linux PC}
 
@@ -1080,35 +1044,18 @@ that runs on different machines, compile it on the oldest machine you have
 
 You need at least gfortran v.4.4 or later to properly compile \qe.
 
-"There is a known incompatibility problem between the calling
-convention for Fortran functions that return complex values: there is the
-convention used by
-g77/f2c, where in practice the compiler converts such functions to subroutines
-with a further parameter for the return value; gfortran instead produces a
-normal function returning a complex value.
-If your system libraries were compiled using g77 (which may happen for
-system-provided libraries in not-too-recent Linux distributions),
-and you instead use gfortran to compile \qe, your code
-may crash or produce random results. This typically happens
-during calls to \texttt{zdotc}, which is one the most commonly used
-complex-returning functions of BLAS+LAPACK.
-
-For further details see for instance this link:\\
-\texttt{http://www.macresearch.org/lapackblas-fortran-106\#comment-17071}\\
-or read the man page of gfortran under the flag \texttt{-ff2c}.
-
+"There is a known incompatibility problem between different calling
+convention for Fortran functions that return complex values [...]
 If your code crashes during a call to \texttt{zdotc},
-try to recompile \qe\ using the internal BLAS and LAPACK
-routines (using i\configure\ options \texttt{--with-internal-blas} and
+recompile \qe\ using the internal BLAS and LAPACK routines 
+(using \configure\ options \texttt{--with-internal-blas} and
 \texttt{--with-internal-lapack})
 to see if the problem disappears; or, add the \texttt{-ff2c} flag"
 (info by Giovanni Pizzi, Jan. 2013).
 
-Note that a similar problem with complex functions exists with MKL libraries
-as well: if you compile with gfortran, link \texttt{-lmkl\_gf\_lp64},
-not \texttt{-lmkl\_intel\_lp64}, and the like for other architectures.
-Since v.5.1, you may use the following workaround:
-add preprocessing option \texttt{-Dzdotc=zdotc\_wrapper} to \texttt{DFLAGS}.
+If you want to use MKL libraries together with gfortran, 
+link \texttt{-lmkl\_gf\_lp64}, not \texttt{-lmkl\_intel\_lp64}
+(and the like for other architectures).
 
 \paragraph{Linux PCs with Intel compiler (ifort)}
 
@@ -1145,7 +1092,7 @@ On Intel CPUs it is very convenient to use Intel MKL libraries
 \texttt{https://software.intel.com/en-us/performance-libraries}).
 MKL libraries can be used also with non-Intel compilers.
 They work also for AMD CPU, selecting the appropriate machine-optimized
-libraries, but with reduced performances.
+libraries: see ``Linux PCs with AMD processors''.
 
 \configure\ properly detects only recent (v.12 or later) MKL libraries,
 as long as the \$MKLROOT environment variable is set in the current shell.
@@ -1166,10 +1113,29 @@ subsequent crash: there is a bug in Intel MPI and MKL 2016 update 3.
 See this thread and the links quoted therein:
 \verb|http://www.mail-archive.com/pw_forum@pwscf.org/msg29684.html|.
 
-\paragraph{Linux PCs with ACML libraries}
-For AMD CPUs, especially recent ones, you may find convenient to
-link AMD acml libraries (can be freely downloaded from AMD web site).
+\paragraph{Linux PCs with AMD processors}
+For AMD CPUs you may find convenient to link AMD acml libraries
+(can be freely downloaded from AMD web site).
 \configure\ should recognize properly installed acml libraries.
+UPDATE (February 2020): ACML have been discontinued. There are new
+libraries called AMD Optimizing CPU Libraries (AOCL), tuned for the
+AMD EPYC processor family.
+`` Recently I played around with some AMD EPYC cpus and the bad thing
+is that I also saw some strange numbers when using libflame/aocl 2.1.
+(...) Since version 2020 the MKL performs rather well when using AMD cpus,
+ however, if you want to get the best performance you have to additionally set:
+\begin{verbatim}
+export MKL_DEBUG_CPU_TYPE=5
+\end{verbatim}
+which gives an additional 10-20\% speedup with MKL 2020,
+while for earlier versions the speedup is greater than 200\%.
+[...] Another note, there seem to be problems using FFTW interface
+of MKL with  AMD cpus. To get around this problem, one has to
+additionally set
+\begin{verbatim}
+export MKL_CBWR=AUTO
+\end{verbatim}
+`` (Info by Tobias Kl\"offel, Feb. 2020)
 
 \subsubsection{Linux PC clusters with MPI}
 \label{SubSec:LinuxPCMPI}
@@ -1214,7 +1180,12 @@ see Sec.\ref{Sec:para} and in particular Sec.\ref{SubSec:badpara}.
 
 \subsubsection{Microsoft Windows}
 \label{SubSec:Windows}
-MS-Windows users may compile \qe\ on MinGW/MSYS. Download the installer from
+Since February 2020 \qe\ can be compiled on MS-Windows 10 using PGI 19.10 
+Community Edition (freely downloadable). \configure\ works with the bash
+script provided by PGI but the \configure\ of FoX fails: use script 
+\texttt{install/build\_fox\_with\_pgi.sh} to manually compile FoX.
+
+Another option: use MinGW/MSYS. Download the installer from
 \texttt{https://osdn.net/projects/mingw/}, install MinGW, MSYS, gcc and
 gfortran. Start a shell window; run "./configure"; edit \texttt{make.inc}; 
 uncommenting the second definition of TOPDIR (the first one introduces a 
@@ -1225,10 +1196,12 @@ reasons.
 Another option is Cygwin, a UNIX environment which runs under Windows: see\\
 \texttt{http://www.cygwin.com/}. 
 
-Finally, Windows-10 users may enable the Windows Subsystem for Linux
-(see here:\\
+Windows-10 users may also enable the Windows Subsystem for Linux (see here:\\
 \texttt{https://docs.microsoft.com/en-us/windows/wsl/install-win10}),
 install a Linux distribution, compile \qe\ as on Linux. It works very well.
+
+As a final option, one can use Quantum Mobile:\\
+\texttt{https://www.materialscloud.org/work/quantum-mobile}.
 
 \subsubsection{Mac OS}
 
@@ -1241,10 +1214,73 @@ Gfortran information and binaries for Mac OS-X here:
 \texttt{http://hpc.sourceforge.net/} and
 \texttt{https://wiki.helsinki.fi/display/HUGG/GNU+compiler+install+on+Mac+OS+X}.
 
-Mysterious crashes, occurring when \texttt{zdotc} is called, are due
-to the same incompatibility of complex functions with some optimized
-BLAS as reported in the "Linux PCs with gfortran" paragraph. Workaround:
-add preprocessing option \texttt{-Dzdotc=zdotc\_wrapper} to \texttt{DFLAGS}.
+Mysterious crashes in \texttt{zdotc} are due to a known incompatibility of 
+complex functions with some optimized BLAS. See the "Linux PCs with gfortran" 
+paragraph.
+
+\subsection{Cray machines}
+
+For Cray XE machines:
+\begin{verbatim}
+$ module swap PrgEnv-cray PrgEnv-pgi
+$ ./configure --enable-openmp --enable-parallel --with-scalapack
+$ vim make.inc
+\end{verbatim}
+then manually add \texttt{-D\_\_IOTK\_WORKAROUND1} at the end of \texttt{DFLAGS} line.
+
+''Now, despite what people can imagine, every CRAY machine deployed can
+have different environment. For example on the machine I usually use
+for tests [...] I do have to unload some modules to make QE running
+properly. On another CRAY [...] there is also Intel compiler as option
+and the system is slightly different compared to the other.
+So my recipe should work, 99\% of the cases.'' (info by Filippo Spiga)
+
+For Cray XT machines, use \texttt{./configure ARCH=crayxt4} or else
+\configure\ will not recognize the Cray-specific software environment.
+
+Older Cray machines: T3D, T3E, X1, are no longer supported.
+
+\subsubsection{Obsolescent architectures}
+
+\paragraph{Intel Xeon Phi}
+
+For Intel Xeon CPUs with Phi coprocessor, see this link:\\
+\texttt{https://software.intel.com/en-us/articles/explicit-offload-for-quantum-espresso}.
+
+There are three ways of compiling:
+\begin{itemize}
+\item {\em offload} mode, executed on main CPU and offloaded onto coprocessor
+"automagically";
+\item {\em native} mode, executed completely on coprocessor;
+\item {\em symmetric} mode, requiring creation of both binaries.
+\end{itemize}
+"You can take advantage of the offload mode using the \texttt{libxphi}
+library. This library offloads the BLAS/MKL functions on the Xeon Phi
+platform hiding the latency times due to the communication. You just
+need to compile this library and then to link it dynamically. The
+library works with any version of QE. Libxphi is available from
+\texttt{https://github.com/cdahnken/libxphi}. Some documentation is
+available therein.
+
+Instead, if you want to compile a native version of QE, you just need
+to add the \texttt{-mmic} flag and cross compile. If you want to use
+the symmetric mode, you need to compile twice: with and without the
+\texttt{-mmic} flag". "[...] everything, i.e. code+libraries, must be
+cross-compiled with the \texttt{-mmic} flag. In my opinion, it's pretty
+unlikely that native mode can outperform the execution on the standard
+Xeon cpu. I strongly suggest to use the Xeon Phi in offload mode, for now"
+(info by Fabio Affinito, March 2015).
+
+\paragraph{IBM BlueGene}
+
+The current \configure\ was working on the machines at CINECA and at J\"ulich.
+For other machines, you may need something like
+\begin{verbatim}
+  ./configure ARCH=ppc64-bg BLAS_LIBS=...  LAPACK_LIBS=... \
+              SCALAPACK_DIR=... BLACS_DIR=..."
+\end{verbatim}
+where the various *\_LIBS and *\_DIR "suggest" where the various libraries
+are located.
 
 \newpage
 

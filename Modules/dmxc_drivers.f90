@@ -265,6 +265,8 @@ SUBROUTINE dmxc_lda( length, rho_in, dmuxc )
      !
      CALL xc_lda( length*2, rhoaux, ex, ec, vx, vc )
      !
+     WHERE ( arho < small ) dr = 1.0_DP ! ... to avoid NaN in the next operation
+     !
      dmuxc(:) = (vx(i1:f1) + vc(i1:f1) - vx(i2:f2) - vc(i2:f2)) / &
                 (2.0_DP * dr(:))
      !
@@ -346,7 +348,7 @@ SUBROUTINE dmxc_lsda( length, rho_in, dmuxc )
      !
      ! ... first case: analytical derivative available
      !
-!!$omp parallel do default(private) shared(rhotot, rho_in, dmuxc )   
+     !$omp parallel do default(private) shared(length,rhotot, rho_in, dmuxc )   
      DO ir = 1, length
         !
         IF (rhotot(ir) < small) CYCLE
@@ -397,7 +399,6 @@ SUBROUTINE dmxc_lsda( length, rho_in, dmuxc )
         dmuxc(ir,2,2) = dmuxc(ir,2,2) + aa - (1.0_DP + zeta_s) * bb +  &
                                              (1.0_DP + zeta_s)**2 * cc
      ENDDO
-!!$omp end parallel do
      !
   ELSE
      !
@@ -570,9 +571,11 @@ SUBROUTINE dmxc_nc( length, rho_in, m, dmuxc )
   aux2(1:length) =  vx(i2:f2,1) + vc(i2:f2,1) - vx(i3:f3,1) - vc(i3:f3,1) - &
                   ( vx(i2:f2,2) + vc(i2:f2,2) - vx(i3:f3,2) - vc(i3:f3,2) )
   !
-  dbx_rho(:) = aux2(1:length) * m(:,1) / (4.0_DP*dr*amag)
-  dby_rho(:) = aux2(1:length) * m(:,2) / (4.0_DP*dr*amag)
-  dbz_rho(:) = aux2(1:length) * m(:,3) / (4.0_DP*dr*amag)
+  WHERE (amag > 1.E-10_DP)
+    dbx_rho(:) = aux2(1:length) * m(:,1) / (4.0_DP*dr*amag)
+    dby_rho(:) = aux2(1:length) * m(:,2) / (4.0_DP*dr*amag)
+    dbz_rho(:) = aux2(1:length) * m(:,3) / (4.0_DP*dr*amag)
+  END WHERE  
   !
   aux1(1:length) =  vx(i4:f4,1) + vc(i4:f4,1) - vx(i5:f5,1) - vc(i5:f5,1) + &
                     vx(i4:f4,2) + vc(i4:f4,2) - vx(i5:f5,2) - vc(i5:f5,2)

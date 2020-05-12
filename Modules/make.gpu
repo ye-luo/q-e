@@ -1,15 +1,18 @@
 MODULES += \
   wavefunctions_gpu.o \
   recvec_gpu.o \
-  uspp_gpu.o \
   becmod_gpu.o \
   becmod_subs_gpu.o \
   cuda_subroutines.o \
   ylmr2_gpu.o \
-  splinelib_gpu.o \
+  dylmr2_gpu.o \
   random_numbers_gpu.o \
-  simpsn_gpu.o \
-  sph_bes_gpu.o
+  sph_bes_gpu.o \
+  correlation_lda_lsda_gpu.o \
+  correlation_gga_gpu.o \
+  exchange_lda_lsda_gpu.o \
+  exchange_gga_gpu.o \
+  metagga_gpu.o
 
 MODFLAGS += \
          $(MOD_FLAG)../GScratch
@@ -40,3 +43,22 @@ uspp_gpu.o : uspp.o
 wavefunctions_gpu.o : control_flags.o
 wavefunctions_gpu.o : kind.o
 wavefunctions_gpu.o : wavefunctions.o
+correlation_lda_lsda_gpu.o : kind.o
+correlation_lda_lsda_gpu.o : constants.o
+correlation_gga_gpu.o : kind.o
+correlation_gga_gpu.o : constants.o
+correlation_gga_gpu.o : correlation_lda_lsda_gpu.o
+exchange_lda_lsda_gpu.o : kind.o
+exchange_lda_lsda_gpu.o : constants.o
+exchange_gga_gpu.o : kind.o
+exchange_gga_gpu.o : constants.o
+metagga_gpu.o : kind.o
+metagga_gpu.o : constants.o
+metagga_gpu.o : correlation_lda_lsda_gpu.o
+metagga_gpu.o : correlation_gga_gpu.o
+metagga_gpu.o : exchange_lda_lsda_gpu.o
+xc_lda_lsda_drivers.o : correlation_lda_lsda_gpu.o
+xc_lda_lsda_drivers.o : exchange_lda_lsda_gpu.o
+xc_lda_lsda_drivers.o : control_flags.o
+xc_lda_lsda_drivers.o : kind.o
+xc_lda_lsda_drivers.o : libxc.o

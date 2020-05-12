@@ -12,12 +12,12 @@ SUBROUTINE punch( what )
   !! the information needed for further processing (phonon etc.).
   !
   !! * what = 'all' : write xml data file, charge density, wavefunctions
-  !!                  (for final data);
+  !!                  (for final data)
   !! * what = 'config' : write xml data file and charge density; also,
   !!                     for nks=1, wavefunctions in plain binary format
   !!                     (see why in comments below). For intermediate 
-  !!                     or incomplete results;
-  !! * what = 'config-nowf' : write xml data file iand charge density only
+  !!                     or incomplete results
+  !! * what = 'config-only' : write xml data file only
   !! * what = 'config-init' : write xml data file only excluding final results
   !!                          (for dry run, can be called at early stages).
   !
@@ -55,7 +55,7 @@ SUBROUTINE punch( what )
   INTEGER            :: cp_status, nt, inlc
   !
   !
-  IF (io_level < 0 ) RETURN
+  IF (io_level < -1 ) RETURN
   !
   WRITE( UNIT = stdout, FMT = '(/,5X,"Writing output data file ",A)' ) &
       TRIM ( restart_dir ( ) )
@@ -72,6 +72,8 @@ SUBROUTINE punch( what )
   wf_collect = ( TRIM(what) == 'all' )
   only_init  = ( TRIM(what) == 'config-init' )
   CALL pw_write_schema( only_init, wf_collect )
+  !
+  IF (io_level < 0 ) RETURN
   !
   ! ... charge density - also writes rho%ns if lda+U and rho%bec if PAW
   ! ... do not overwrite the scf charge density with a non-scf one

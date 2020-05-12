@@ -18,7 +18,7 @@ SUBROUTINE init_run()
                                        ndr, ndw, tfor, tprnfor, tpre, ts_vdw, &
                                        force_pairing
   USE cp_electronic_mass,       ONLY : emass, emass_cutoff
-  USE ions_base,                ONLY : na, nax, nat, nsp, iforce, amass, cdms
+  USE ions_base,                ONLY : na, nax, nat, nsp, iforce, amass, cdms, ityp
   USE ions_positions,           ONLY : tau0, taum, taup, taus, tausm, tausp, &
                                        vels, velsm, velsp, fion, fionm
   USE gvecw,                    ONLY : ngw, ngw_g, g2kin, g2kin_init
@@ -27,8 +27,9 @@ SUBROUTINE init_run()
   USE fft_base,                 ONLY : dfftp, dffts
   USE electrons_base,           ONLY : nspin, nbsp, nbspx, nupdwn, f
   USE uspp,                     ONLY : nkb, vkb, deeq, becsum,nkbus
+  USE uspp_gpum,                ONLY : vkb_d
   USE core,                     ONLY : rhoc
-  USE wavefunctions,     ONLY : c0_bgrp, cm_bgrp, phi_bgrp
+  USE wavefunctions,            ONLY : c0_bgrp, cm_bgrp, allocate_cp_wavefunctions
   USE ensemble_dft,             ONLY : tens, z0t
   USE cg_module,                ONLY : tcg
   USE electrons_base,           ONLY : nudx, nbnd
@@ -42,7 +43,7 @@ SUBROUTINE init_run()
                                        irb, eigrb, rhog, rhos, rhor,     &
                                        acc, acc_this_run, wfill, &
                                        edft, nfi, vpot, ht0, htm, iprint_stdout
-  USE cp_main_variables,        ONLY : allocate_mainvar, descla
+  USE cp_main_variables,        ONLY : allocate_mainvar, idesc
   USE energies,                 ONLY : eself, enl, ekin, etot, enthal, ekincm
   USE dener,                    ONLY : detot
   USE time_step,                ONLY : dt2, delt, tps
@@ -80,6 +81,9 @@ SUBROUTINE init_run()
   USE cell_base,                ONLY : ref_tpiba2, init_tpiba2
   USE tsvdw_module,             ONLY : tsvdw_initialize
   USE exx_module,               ONLY : exx_initialize
+#if defined (__CUDA)
+  USE cudafor
+#endif
   !
   IMPLICIT NONE
   !
@@ -168,10 +172,7 @@ SUBROUTINE init_run()
   !
   !  initialize wave functions descriptors and allocate wf
   !
-  IF(lwfpbe0nscf) ALLOCATE(cv0( ngw, vnbsp ) )   ! Lingzhu Kong
-  ALLOCATE( c0_bgrp( ngw, nbspx ) )
-  ALLOCATE( cm_bgrp( ngw, nbspx ) )
-  ALLOCATE( phi_bgrp( ngw, nbspx ) )
+  CALL allocate_cp_wavefunctions( ngw, nbspx, vnbsp, lwfpbe0nscf )
   !
   IF ( iverbosity > 1 ) THEN
      !
@@ -200,6 +201,9 @@ SUBROUTINE init_run()
   ALLOCATE( deeq( nhm, nhm, nat, nspin ) )
   !
   ALLOCATE( vkb( ngw, nkb ) )
+#if defined(_CUDA)
+  ALLOCATE( vkb_d( ngw, nkb ) )
+#endif
   !
   IF ( dft_is_meta() .AND. tens ) &
      CALL errore( ' init_run ', 'ensemble_dft not implemented for metaGGA', 1 )
@@ -228,7 +232,7 @@ SUBROUTINE init_run()
      IF( nbgrp > 1 ) &
         CALL errore( ' init_run ', ' ensemble_dft with band parallelization not implemented ', 1 )
      CALL allocate_ensemble_dft( nkb, nbsp, ngw, nudx, nspin, nbspx, &
-                                 dffts%nnr, nat, descla )
+                                 dffts%nnr, nat, idesc )
   END IF
   !
   IF ( tcg ) THEN 
@@ -261,14 +265,9 @@ SUBROUTINE init_run()
   !
   hnew = h
   !
-  IF(lwfpbe0nscf) cv0=( 0.D0, 0.D0 )    ! Lingzhu Kong
-  cm_bgrp  = ( 0.D0, 0.D0 )
-  c0_bgrp  = ( 0.D0, 0.D0 )
-  phi_bgrp = ( 0.D0, 0.D0 )
-  !
   IF ( tens ) then
-     CALL id_matrix_init( descla, nspin )
-     CALL h_matrix_init( descla, nspin )
+     CALL id_matrix_init( idesc, nspin )
+     CALL h_matrix_init( idesc, nspin )
   ENDIF
   !
   a1(:)=at(:,1)*alat; a2(:)=at(:,2)*alat; a3(:)=at(:,3)*alat 
@@ -353,7 +352,7 @@ SUBROUTINE init_run()
   !
   !  Set center of mass for scaled coordinates
   !
-  CALL ions_cofmass( taus, amass, na, nsp, cdms )
+  CALL ions_cofmass( taus, amass, nat, ityp, cdms )
   !
   IF ( nbeg <= 0 .OR. lwf ) THEN
      !

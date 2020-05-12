@@ -23,8 +23,6 @@ PROGRAM lr_eels_main
                                   & plot_type, nbnd_total, pseudo_hermitian, &
                                   & itermax_int, revc0, lr_io_level, code2, &
                                   & eels, approximation 
-  USE io_files,              ONLY : nd_nmbr
-  USE global_version,        ONLY : version_number
   USE ions_base,             ONLY : tau,nat,atm,ityp
   USE environment,           ONLY : environment_start
   USE mp_global,             ONLY : mp_startup
@@ -33,7 +31,6 @@ PROGRAM lr_eels_main
   USE mp_bands,              ONLY : intra_bgrp_comm, inter_bgrp_comm, &
                                     ntask_groups
   USE mp_bands_TDDFPT,       ONLY : ibnd_start, ibnd_end
-  USE mp_diag,               ONLY : mp_start_diag
   USE command_line_options,  ONLY : ndiag_
   USE wvfct,                 ONLY : nbnd
   USE wavefunctions,         ONLY : psic
@@ -43,6 +40,8 @@ PROGRAM lr_eels_main
   USE wrappers,              ONLY : memstat
   !
   IMPLICIT NONE
+  !
+  include 'laxlib.fh'
   !
   ! Local variables
   !
@@ -55,7 +54,7 @@ PROGRAM lr_eels_main
   pol_index = 1
   !
   CALL mp_startup ( )
-  CALL mp_start_diag ( ndiag_, world_comm, intra_bgrp_comm, &
+  CALL laxlib_start ( ndiag_, world_comm, intra_bgrp_comm, &
        do_distr_diag_inside_bgrp_ = .true. )
   CALL set_mpi_comm_4_solvers( intra_pool_comm, intra_bgrp_comm, &
        inter_bgrp_comm )
@@ -223,7 +222,7 @@ PROGRAM lr_eels_main
   !
   CALL print_clock_lr()
   !
-  CALL laxlib_free_ortho_group()
+  CALL laxlib_end()
   CALL stop_lr( .TRUE. )
   !
   IF (lr_verbosity > 5) THEN

@@ -33,7 +33,7 @@ MODULE funct
   !                      dft_has_finite_size_correction
   !
   !
-  USE io_global,   ONLY: stdout
+  USE io_global,   ONLY: stdout, ionode
   USE kinds,       ONLY: DP
 #if defined(__LIBXC)
   USE xc_f90_types_m
@@ -207,6 +207,7 @@ MODULE funct
   !              "c090"   vdW-DF-c09+HF/4 (c09-0)        igcx =40 
   !              "b86x"   B86b exchange * 0.75           igcx =41
   !              "b88x"   B88 exchange * 0.50            igcx =42
+  !              "beex"   BEE exchange                   igcx =43 
   !
   ! Gradient Correction on Correlation:
   !              "nogc"   none                           igcc =0 (default)
@@ -220,6 +221,7 @@ MODULE funct
   !              "pbe"    same as PBX, back-comp.        igcc =9
   !              "q2dc"   Q2D correlation grad corr      igcc =12
   !              "x3lp"   X3LYP (Lee-Yang-Parr*0.871)    igcc =13
+  !              "beec"   BEE correlation                igcc =14
   !
   ! Meta-GGA functionals
   !              "tpss"   TPSS Meta-GGA                  imeta=1
@@ -354,7 +356,13 @@ MODULE funct
   REAL(DP):: finite_size_cell_volume = notset
   LOGICAL :: discard_input_dft = .FALSE.
   !
-  INTEGER, PARAMETER :: nxc=8, ncc=10, ngcx=42, ngcc=12, nmeta=6, ncnl=6
+#ifdef use_beef
+  INTEGER  :: beeftype    = -1
+  LOGICAL, EXTERNAL :: beef_set_type
+  INTEGER  :: beefvdw = 0
+#endif
+  !
+  INTEGER, PARAMETER :: nxc=8, ncc=10, ngcx=43, ngcc=13, nmeta=6, ncnl=6
   CHARACTER(LEN=4) :: exc, corr, gradx, gradc, meta, nonlocc
   DIMENSION :: exc(0:nxc), corr(0:ncc), gradx(0:ngcx), gradc(0:ngcc), &
                meta(0:nmeta), nonlocc(0:ncnl)
@@ -369,10 +377,10 @@ MODULE funct
                'OBK8', 'OB86', 'EVX', 'B86R', 'CX13', 'X3LP', &
                'CX0', 'R860', 'CX0P', 'AHCX', 'AHF2', &
                'AHPB', 'AHPS', 'CX14', 'CX15', 'BR0', 'CX16', 'C090', &
-               'B86X', 'B88X'/
+               'B86X', 'B88X', 'BEEX'/
   !
   DATA gradc / 'NOGC', 'P86', 'GGC', 'BLYP', 'PBC', 'HCTH', 'NONE',&
-               'B3LP', 'PSC', 'PBE', 'xxxx', 'xxxx', 'Q2DC' /
+               'B3LP', 'PSC', 'PBE', 'xxxx', 'xxxx', 'Q2DC', 'BEEC' /
   !
   DATA meta  / 'NONE', 'TPSS', 'M06L', 'TB09', 'META', 'SCAN', 'SCA0' /
   !
@@ -534,6 +542,33 @@ CONTAINS
     ! special case : GAUPBE
     CASE( 'GAUP', 'GAUPBE' )
        dft_defined = set_dft_values(1,4,20,4,0,0)
+    ! special case : case BEEF (default: BEEF-vdW-DF2)
+    CASE('BEEF', 'BEEF-VDW')
+#ifdef use_beef
+       IF (LEN_TRIM(dftout) .EQ. 4) then
+          beeftype = 0
+       ELSE
+          SELECT CASE(TRIM(dftout(5:)))
+             CASE('-VDW')
+                beeftype = 0
+             CASE default
+                READ(dftout(5:), '(i1)', IOSTAT=i) beeftype
+                if (i.ne.0) call errore('set_dft_from_name', &
+                & 'unknown BEEF type', 1)
+          END SELECT
+       ENDIF
+       IF (.NOT. beef_set_type(beeftype, ionode)) &
+       & call errore('set_dft_from_name', 'unknown BEEF type number', 1)
+       SELECT CASE(beeftype)
+          CASE(0)
+             ! turn on vdW-DF2 type interactions for BEEF-vdW
+             beefvdw = 2
+       END SELECT
+       dft_defined = set_dft_values(1,4,43,14,beefvdw,0)
+#else
+       CALL errore('set_dft_from_name', &
+    &    'BEEF xc functional support not compiled in', 1)
+#endif
     ! Special case vdW-DF
     CASE( 'VDW-DF' )
        dft_defined = set_dft_values(1,4,4,0,1,0)
@@ -648,14 +683,16 @@ CONTAINS
           READ( dftout(8:10),  * ) icorr
           READ( dftout(12:14), * ) igcx
           READ( dftout(16:18), * ) igcc
-          imeta  = 0
-          imetac = 0 
+          READ( dftout(20:22), * ) imeta
+          READ( dftout(24:26), * ) imetac
           inlc   = 0
           !
           IF (iexch /= 0) is_libxc(1) = .TRUE.
           IF (icorr /= 0) is_libxc(2) = .TRUE.
           IF (igcx  /= 0) is_libxc(3) = .TRUE.
           IF (igcc  /= 0) is_libxc(4) = .TRUE.
+          IF (imeta /= 0) is_libxc(5) = .TRUE.
+          IF (imetac/= 0) is_libxc(6) = .TRUE.
           !
           dft_defined = .TRUE.
 #else
@@ -1422,8 +1459,8 @@ CONTAINS
   FUNCTION get_dft_short()
     !---------------------------------------------------------------------
     !
-    CHARACTER(LEN=18) :: get_dft_short
-    CHARACTER(LEN=18) :: shortname
+    CHARACTER(LEN=26) :: get_dft_short
+    CHARACTER(LEN=26) :: shortname
     !
     shortname = 'no shortname'
     !
@@ -1481,6 +1518,8 @@ CONTAINS
        shortname = 'OPTB86B'
     ELSEIF (iexch==1 .AND. icorr==4  .AND. igcx==25.AND. igcc== 0) THEN
        shortname = 'EV93'
+    ELSEIF (iexch==1 .AND. icorr==4  .AND. igcx==43 .AND. igcc==14 .AND. inlc==2) THEN
+       shortname = 'BEEF'
     ELSEIF (iexch==5 .AND. icorr==0  .AND. igcx==0 .AND. igcc== 0) THEN
        shortname = 'HF'
     ENDIF
@@ -1489,18 +1528,12 @@ CONTAINS
        shortname = 'TPSS'
     ELSEIF (imeta == 2) THEN
        shortname = 'M06L'
-    ELSEIF (imeta == 3) THEN
-       shortname = 'TB09'
     ELSEIF (imeta == 4) THEN
        IF ( iexch == 1 .AND. icorr == 1) THEN
           shortname = 'PZ+META'
        ELSEIF (iexch==1 .AND. icorr==4 .AND. igcx==3 .AND. igcc==4) THEN
           shortname = 'PBE+META'
        ENDIF
-    ELSEIF (imeta == 5 ) THEN
-       shortname = 'SCAN'
-    ELSEIF (imeta == 6 ) THEN
-       shortname = 'SCAN0'
     ENDIF
     !
     IF (inlc==1) THEN
@@ -1539,11 +1572,20 @@ CONTAINS
     !
 #if defined(__LIBXC)
     IF ( ANY(is_libxc(:)) ) THEN
-       shortname = 'XC-000-000-000-000'
-       WRITE( shortname(4:6),   '(i3.3)' ) iexch
-       WRITE( shortname(8:10),  '(i3.3)' ) icorr
-       WRITE( shortname(12:14), '(i3.3)' ) igcx
-       WRITE( shortname(16:18), '(i3.3)' ) igcc
+       IF (imeta==263 .AND. imetac==267) THEN
+          shortname = 'SCAN'
+          IF (scan_exx) shortname = 'SCAN0'
+       ELSEIF (imeta == 208 .AND. imetac==231) THEN
+          shortname = 'TB09'
+       ELSE
+          shortname = 'XC-000-000-000-000-000-000'
+          WRITE( shortname(4:6),   '(i3.3)' ) iexch
+          WRITE( shortname(8:10),  '(i3.3)' ) icorr
+          WRITE( shortname(12:14), '(i3.3)' ) igcx
+          WRITE( shortname(16:18), '(i3.3)' ) igcc
+          WRITE( shortname(20:22), '(i3.3)' ) imeta
+          WRITE( shortname(24:26), '(i3.3)' ) imetac
+       ENDIF
     ENDIF
 #endif
     !

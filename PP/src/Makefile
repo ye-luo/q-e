@@ -36,6 +36,7 @@ paw_postproc.o \
 projections_mod.o \
 projwfc_box.o \
 punch_plot.o \
+read_proj.o \
 smallgk.o \
 stm.o \
 stop_pp.o \
@@ -53,7 +54,7 @@ write_hamiltonians.o \
 xc_vdW_scale_mod.o   # added by Yang Jiao
 
 PWOBJS = ../../PW/src/libpw.a
-QEOBJS = ../../Modules/libqemod.a ../../KS_Solvers/libks_solvers.a \
+QEOBJS = ../../Modules/libqemod.a ../../upflib/libupf.a ../../KS_Solvers/libks_solvers.a \
          ../../FFTXlib/libqefft.a ../../LAXlib/libqela.a ../../GScratch/libgscratch.a ../../UtilXlib/libutil.a \
          ../../dft-d3/libdftd3qe.a
 
