@@ -1,4 +1,4 @@
-# Makefile for Modules
+#/a Makefile for Modules
 
 include ../make.inc
 
@@ -9,10 +9,11 @@ MODFLAGS=$(BASEMOD_FLAGS) \
 # list of modules
 
 MODULES = \
-atom.o \
+additional_kpoints.o \
 autopilot.o \
 basic_algebra_routines.o \
 becmod.o \
+beef_interface.o \
 bfgs_module.o \
 bspline.o \
 bz_form.o \
@@ -23,10 +24,17 @@ compute_dipole.o \
 constants.o \
 constraints_module.o \
 control_flags.o \
+correlation_lda_lsda.o \
+correlation_gga.o \
 coulomb_vcut.o \
+dgcxc_drivers.o \
 dist.o \
+dmxc_drivers.o \
+dgcxc_drivers.o \
 electrons_base.o \
 environment.o \
+exchange_lda_lsda.o \
+exchange_gga.o \
 fcp_variables.o \
 fd_gradient.o \
 fft_base.o \
@@ -34,7 +42,6 @@ fft_rho.o \
 fsockets.o \
 funct.o \
 generate_function.o \
-gth.o \
 gradutils.o \
 gvecw.o \
 input_parameters.o \
@@ -42,9 +49,8 @@ invmat.o \
 io_files.o \
 io_global.o  \
 ions_base.o \
-kernel_table.o \
 kind.o \
-libxc.o \
+lmdif.o \
 mdiis.o \
 mm_dispersion.o \
 mp_bands.o \
@@ -62,45 +68,34 @@ paw_variables.o \
 plugin_flags.o \
 plugin_arguments.o \
 plugin_variables.o \
-pseudo_types.o \
 pw_dot.o \
 qmmm.o \
-radial_grids.o \
 random_numbers.o \
 read_cards.o \
 read_input.o \
 read_namelists.o \
-read_ncpp.o \
 read_pseudo.o \
-read_upf_v1.o \
-read_upf_v2.o \
-read_upf_schema.o \
-read_uspp.o \
 recvec.o \
 recvec_subs.o \
 run_info.o \
 space_group.o \
 set_signal.o \
+set_vdw_corr.o \
 setqf.o \
-splinelib.o \
 timestep.o\
 tsvdw.o\
-emend_upf.o \
-upf.o \
-upf_to_internal.o \
-uspp.o \
 version.o \
 wannier_gw.o\
 wannier_new.o \
 wave_base.o \
 wavefunctions.o \
 wrappers.o\
-write_upf.o \
-write_upf_v2.o \
-write_upf_schema.o \
 ws_base.o \
 xc_vdW_DF.o \
 xc_rVV10.o \
+xc_lda_lsda_drivers.o \
+xc_gga_drivers.o \
+xc_mgga_drivers.o \
 io_base.o \
 qes_types_module.o \
 qes_libs_module.o  \
@@ -111,6 +106,8 @@ qes_init_module.o \
 qes_read_module.o \
 qes_bcast_module.o \
 qexsd.o   \
+qexsd_copy.o   \
+qexsd_init.o   \
 qexsd_input.o \
 hdf5_qe.o\
 qeh5_module.o\
@@ -118,20 +115,19 @@ fox_init_module.o \
 xsf.o \
 wyckoff.o \
 wypos.o \
-zdotc_wrapper.o  \
 zvscal.o 
 
 # list of subroutines and functions (not modules) previously found in flib/
 
 OBJS = \
-atomic_number.o \
+atom_weight.o \
 capital.o \
+correlation_gga.o \
 cryst_to_car.o \
 erf.o \
+exchange_gga.o \
 expint.o \
-functionals.o \
 generate_k_along_lines.o \
-lsda_functionals.o \
 more_functionals.o \
 has_xml.o \
 inpfile.o \
@@ -147,7 +143,6 @@ recips.o \
 remove_tot_torque.o \
 set_hubbard_l.o \
 set_hubbard_n.o \
-simpsn.o \
 sort.o \
 sph_bes.o \
 sph_dbes.o \
@@ -156,13 +151,12 @@ test_input_file.o \
 date_and_tim.o \
 volume.o \
 dylmr2.o \
-ylmr2.o \
 wgauss.o \
 w0gauss.o \
 w1gauss.o \
 deviatoric.o
 
-TLDEPS=libiotk libfox libutil libla libfft
+TLDEPS=libfox libutil libla libfft
 
 all : libqemod.a
 

@@ -15,7 +15,6 @@
  */
 
 #if defined(__HDF5) || defined(__HDF5_C)
-
 #include <stdio.h> 
 #include <string.h>
 #include <stdlib.h>
@@ -499,7 +498,7 @@ void F77_FUNC_(esh5_close_density,ESH5_CLOSE_DENSITY)()
 /* write eigen value and eigen vector for (ibnd, ispin) */
 void F77_FUNC_(esh5_write_density_r,ESH5_WRITE_DENSITY_R)(const int* ispin,const double* rho)
 {
-  char aname[8];
+  char aname[32];
   sprintf(aname,"spin_%i",(*ispin)-1);
   /*hid_t h2 = H5Gcreate(h_density,aname,0);*/
   hid_t h2 = H5Gopen(h_density,aname);
@@ -513,7 +512,7 @@ void F77_FUNC_(esh5_write_density_r,ESH5_WRITE_DENSITY_R)(const int* ispin,const
 void F77_FUNC_(esh5_write_density_g,ESH5_WRITE_DENSITY_G)
      (const int* ispin , const double* rhog)
 {
-  char aname[8];
+  char aname[32];
   sprintf(aname,"spin_%i",(*ispin)-1);
   /*hid_t h2 = H5Gopen(h_density,aname);*/
   hid_t h2 = H5Gcreate(h_density,aname,0);
@@ -640,7 +639,7 @@ void F77_FUNC_(esh5_write_species,ESH5_WRITE_SPECIES)(const int* itype
     , const char* sname, const int* length
     , const double* atomic_number, const double* valcharge)
 {
-  char aname[16];
+  char aname[32];
   sprintf(aname,"species_%i",(*itype)-1);
   hid_t h1 = H5Gcreate(h_ptcls,aname,0);
   hsize_t dim1=1;
