@@ -80,13 +80,15 @@ option(QE_ENABLE_SCALAPACK
 option(QE_ENABLE_ELPA
     "enable ELPA execution units" OFF)
 option(QE_ENABLE_HDF5
-    "enable HDF5 data collection" OFF)
+    "enable HDF5 data collection" ON)
 option(QE_ENABLE_CUDA
     "enable CUDA acceleration on NVIDIA GPUs" OFF)
 option(QE_ENABLE_DOC
     "enable documentation building" OFF)
 set(QE_FFTW_VENDOR "AUTO" CACHE 
     STRING "select a specific FFTW library [Intel_DFTI, Intel_FFTW3, ArmPL, IBMESSL, FFTW3, Internal]")
+option(QE_ENABLE_PW2QMCPACK
+    "enable pw2qmcpack" ON)
 
 # TODO change all ifdefs throughout code base to match
 # cmake options
@@ -138,6 +140,9 @@ endif()
 # if(QE_ENABLE_HDF5 AND NOT QE_ENABLE_MPI)
 #    message(FATAL_ERROR "HDF5 requires MPI support, enable it with '-DQE_ENABLE_MPI=ON' or disable HDF5 with '-DQE_ENABLE_HDF5=OFF'")
 # endif()
+if(QE_ENABLE_PW2QMCPACK AND NOT QE_ENABLE_HDF5)
+    message(FATAL_ERROR "pw2qmcpack requires HDF5 support, enable it with '-DQE_ENABLE_HDF5=ON' or disable pw2qmcpack with '-DQE_ENABLE_PW2QMCPACK=OFF'")
+endif()
 
 
 ###########################################################
@@ -333,7 +338,7 @@ if(QE_ENABLE_HDF5)
     if(QE_ENABLE_MPI)
         option(HDF5_PREFER_PARALLEL "Prefer parallel HDF5" ON)
     endif()
-    find_package(HDF5 REQUIRED Fortran C)
+    find_package(HDF5 REQUIRED Fortran C HL)
     if(NOT HDF5_FOUND)
         message(FATAL_ERROR "HDF5 Fortran interface has not been found!")
     endif()

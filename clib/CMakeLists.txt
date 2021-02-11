@@ -17,6 +17,13 @@ set(sources
 qe_add_library(qe_clib ${sources})
 add_library(QE::CLIB ALIAS qe_clib)
 
+if(QE_ENABLE_PW2QMCPACK)
+  set(sources_esh5 esh5_interfaces.c)
+  qe_add_library(qe_clib_esh5 ${sources_esh5})
+  set_target_properties(qe_clib_esh5 PROPERTIES COMPILE_DEFINITIONS "H5_USE_16_API")
+  target_link_libraries(qe_clib_esh5 PRIVATE QE::HDF5_C)
+endif()
+
 ###########################################################
 
 qe_install_targets(qe_clib)

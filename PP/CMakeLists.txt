@@ -440,6 +440,22 @@ target_link_libraries(qe_pp_ppacf_exe
         QE::FFTX)
 
 ###########################################################
+# pw2qmcpack.x
+###########################################################
+set(sources src/pw2qmcpack.f90)
+qe_add_executable(qe_pp_pw2qmcpack_exe ${sources})
+set_target_properties(qe_pp_pw2qmcpack_exe PROPERTIES OUTPUT_NAME pw2qmcpack.x)
+target_link_libraries(qe_pp_pw2qmcpack_exe
+    PRIVATE
+        QE::PW
+        QE::PP
+        QE::Modules
+        QE::FOX
+        QE::UTILX
+        QE::FFTX
+        qe_clib_esh5)
+
+###########################################################
 # benchmark_libxc.x
 ###########################################################
 set(sources src/xctest_qe_libxc.f90)
