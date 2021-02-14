@@ -223,7 +223,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   integer, allocatable :: rir(:)
   COMPLEX(DP), ALLOCATABLE :: tmp_evc(:)
 
-  CHARACTER(256)          :: tmp,h5name,eigname,tmp_combo
+  CHARACTER(256)          :: tmp, h5name, tmp_combo
 
   INTEGER :: rest, nbase, basekindex, nktot
   REAL(DP) :: xk_cryst(3)
@@ -231,7 +231,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   INTEGER :: npwx_tot, igk_g;
 ! **********************************************************************
   TYPE(xmlf_t) :: xmlfile
-  CHARACTER(len=256) :: small_buf, tmp_buf1, tmp_buf2, tmp_buf3
+  CHARACTER(len=256) :: small_buf, tmp_buf1
   CHARACTER(len=4096) :: large_buf
   INTEGER :: i
 ! **********************************************************************
@@ -411,17 +411,10 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   if((npool>1) .and. (my_pool_id>0)) then
     tmp_buf1=''
     write(tmp_buf1,*) my_pool_id
-    h5name = TRIM( prefix ) // '.pwscf.h5' // "_part"//trim(tmp_buf1)
+    h5name = TRIM( prefix ) // '.pwscf.h5' // "_part"//trim(adjustl(tmp_buf1))
   else
     h5name = TRIM( prefix ) // '.pwscf.h5'
   endif
-  tmp_buf1=''
-  tmp_buf2=''
-  tmp_buf3=''
-  write(tmp_buf1,*) nr1s
-  write(tmp_buf2,*) nr2s
-  write(tmp_buf3,*) nr3s
-  eigname = "eigenstates_"//trim(tmp_buf1)//'_'//trim(tmp_buf2)//'_'//trim(tmp_buf3)
 
   tmp = TRIM( tmp_dir )//TRIM( h5name )
   h5len = LEN_TRIM(tmp)

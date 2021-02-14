@@ -881,8 +881,8 @@ void F77_FUNC_(esh5_join_all,ESH5_JOIN_ALL)(const char* fname, const int* length
     
     if(h_ptcls2 < 0)
     {
-      printf("WHOAAA!!! No electrons?!");
-      return;
+      fprintf(stderr, "WHOAAA!!! No electrons?!");
+      abort();
     }
     else
     {
