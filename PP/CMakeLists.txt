@@ -450,8 +450,7 @@ target_link_libraries(qe_pp_pw2qmcpack_exe
         QE::PW
         QE::PP
         QE::Modules
-        QE::FOX
-        QE::UTILX
+        QE::UPF
         QE::FFTX
         qe_clib_esh5)
 

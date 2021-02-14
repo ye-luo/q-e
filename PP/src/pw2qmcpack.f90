@@ -18,7 +18,9 @@ PROGRAM pw2qmcpack
   USE mp_global,  ONLY : mp_startup, npool, nimage, nproc_pool, nproc_file, nproc_pool_file
   USE control_flags, ONLY : gamma_only
   USE mp_world,   ONLY : world_comm, nproc
-  USE environment,ONLY : environment_start, environment_end
+  USE environment, ONLY : environment_start, environment_end
+  USE uspp, ONLY : okvan
+  USE paw_variables, ONLY : okpaw
   USE KINDS, ONLY : DP
   !
   IMPLICIT NONE
@@ -76,7 +78,10 @@ PROGRAM pw2qmcpack
   IF ( gamma_only ) &
     CALL errore('pw2qmcpack', 'Using gamma trick results a reduced G space that is not supported by QMCPACK &
                              & though pw2qmcpack itself still can convert the WF to an h5 file in this case (experts only). &
-                             & Please run pw.x with k point 0.0 0.0 0.0 instead of gamma.',1)
+                             & Please run pw.x with k point 0.0 0.0 0.0 instead of gamma.', 1)
+  IF (okvan .or. okpaw) &
+    CALL errore('pw2qmcpack', 'QMCPACK has no supports for US or PAW non-local pseudopotentials generated orbitals. &
+                             & Use norm conserving ones.', 1)
   !
   CALL openfil_pp
   !
