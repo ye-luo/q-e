@@ -1,16 +1,16 @@
 !
-! Copyright (C) 2004 PWSCF group 
+! Copyright (C) 2004-2021 QMCPACK developers
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
 ! or http://www.gnu.org/copyleft/gpl.txt .
-! 
-!----------------------------------------------------------------------- 
+!
+!-----------------------------------------------------------------------
 PROGRAM pw2qmcpack
-  !----------------------------------------------------------------------- 
+  !-----------------------------------------------------------------------
 
   ! This subroutine writes the file "prefix".pwscf.xml and "prefix".pwscf.h5
-  ! containing the  plane wave coefficients and other stuff needed by QMCPACK. 
+  ! containing the  plane wave coefficients and other stuff needed by QMCPACK.
 
   USE io_files,  ONLY : nd_nmbr, prefix, tmp_dir
   USE io_global, ONLY : stdout, ionode, ionode_id
@@ -41,9 +41,9 @@ PROGRAM pw2qmcpack
      CALL errore('pw2qmcpack', ' image parallelization not (yet) implemented', 1)
 
   !   CALL start_postproc(nd_nmbr)
-  ! 
-  !   set default values for variables in namelist 
-  ! 
+  !
+  !   set default values for variables in namelist
+  !
   prefix = 'pwscf'
   write_psir = .false.
   expand_kp = .false.
@@ -51,7 +51,7 @@ PROGRAM pw2qmcpack
   CALL get_environment_variable( 'ESPRESSO_TMPDIR', outdir )
   IF ( TRIM( outdir ) == ' ' ) outdir = './'
   ios = 0
-  IF ( ionode )  THEN 
+  IF ( ionode )  THEN
      !
      CALL input_from_file ( )
      !READ (5, inputpp, err=200, iostat=ios)
@@ -59,16 +59,16 @@ PROGRAM pw2qmcpack
      tmp_dir = trimcheck (outdir)
      !
   END IF
-  CALL mp_bcast( ios, ionode_id, world_comm ) 
+  CALL mp_bcast( ios, ionode_id, world_comm )
   IF ( ios/=0 ) CALL errore('pw2qmcpack', 'reading inputpp namelist', ABS(ios))
-  ! 
-  ! ... Broadcast variables 
-  ! 
-  CALL mp_bcast(prefix, ionode_id, world_comm ) 
-  CALL mp_bcast(tmp_dir, ionode_id, world_comm ) 
-  CALL mp_bcast(write_psir, ionode_id, world_comm ) 
-  CALL mp_bcast(expand_kp, ionode_id, world_comm ) 
-  CALL mp_bcast(debug, ionode_id, world_comm ) 
+  !
+  ! ... Broadcast variables
+  !
+  CALL mp_bcast(prefix, ionode_id, world_comm )
+  CALL mp_bcast(tmp_dir, ionode_id, world_comm )
+  CALL mp_bcast(write_psir, ionode_id, world_comm )
+  CALL mp_bcast(expand_kp, ionode_id, world_comm )
+  CALL mp_bcast(debug, ionode_id, world_comm )
   !
   CALL start_clock ( 'read_file' )
   CALL read_file
@@ -84,7 +84,7 @@ PROGRAM pw2qmcpack
   CALL compute_qmcpack(write_psir, expand_kp, debug)
   CALL stop_clock ( 'compute_qmcpack' )
   !
-  IF ( ionode ) THEN 
+  IF ( ionode ) THEN
     WRITE( 6, * )
     !
     CALL print_clock( 'read_file_lite' )
@@ -109,7 +109,7 @@ PROGRAM pw2qmcpack
   CALL stop_pp
   STOP
 
-  
+
 
 END PROGRAM pw2qmcpack
 
@@ -179,7 +179,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   USE mp_global,            ONLY: npool, my_pool_id, intra_image_comm
   USE mp_pools,             ONLY: me_pool
   USE mp,                   ONLY: mp_sum, mp_max, mp_bcast, mp_barrier
-  use scatter_mod,          ONLY : gather_grid, scatter_grid 
+  use scatter_mod,          ONLY : gather_grid, scatter_grid
   use fft_base,             ONLY : dffts
   use fft_interfaces,       ONLY : invfft, fwfft
   USE dfunct, ONLY : newd
@@ -210,21 +210,21 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   COMPLEX(DP), DIMENSION(:), POINTER :: psiCptr
   REAL(DP), DIMENSION(:), POINTER :: psiRptr
 ! **********************************************************************
-  INTEGER :: npw_sym  
+  INTEGER :: npw_sym
   INTEGER, ALLOCATABLE, TARGET :: igk_sym(:)
   REAL(DP), ALLOCATABLE :: g2kin_sym(:)
 ! **********************************************************************
   INTEGER :: nkfull,max_nk,max_sym,isym,nxxs
-  INTEGER , ALLOCATABLE :: num_irrep(:) 
-  INTEGER, ALLOCATABLE :: xkfull_index(:,:) ! maps to sym_list and xk_full_list  
+  INTEGER , ALLOCATABLE :: num_irrep(:)
+  INTEGER, ALLOCATABLE :: xkfull_index(:,:) ! maps to sym_list and xk_full_list
   INTEGER, ALLOCATABLE :: sym_list(:)
   REAL(DP),    ALLOCATABLE :: xk_full_list(:,:)
   REAL(DP) :: t1, t2, dt
-  integer, allocatable :: rir(:)  
+  integer, allocatable :: rir(:)
   COMPLEX(DP), ALLOCATABLE :: tmp_evc(:)
 
   CHARACTER(256)          :: tmp,h5name,eigname,tmp_combo
-  
+
   INTEGER :: rest, nbase, basekindex, nktot
   REAL(DP) :: xk_cryst(3)
 
@@ -235,19 +235,19 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   CHARACTER(len=4096) :: large_buf
   INTEGER :: i
 ! **********************************************************************
-  
+
   NULLIFY(psiRptr)
   NULLIFY(psiCptr)
 
   ! Ye Luo
   ! define the pool level ionode
   ! an image ionode must be pool ionode
-  if(me_pool==0) then 
+  if(me_pool==0) then
     pool_ionode=.true.
   else
     pool_ionode=.false.
   endif
-  
+
   ! MAMorales:
   ! removed USPP functions
 
@@ -257,7 +257,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   CALL mp_sum ( npwx_tot, intra_pool_comm )
   CALL mp_max ( npwx_tot, inter_pool_comm )
   !write(*,*) mpime, ionode_id, npwx_tot, npw
-  
+
   ! this limits independent definition of ecutrho to < 4*ecutwf
   ! four times npwx should be enough
   ALLOCATE (indx (4*npwx_tot) )
@@ -274,10 +274,10 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   nbase = nks * my_pool_id
   IF ( ( my_pool_id + 1 ) > rest ) nbase = nbase + rest * kunit
   !write(*,*) "debug",mpime, nks, nbase
-  
+
   IF( lsda ) THEN
 !      IF( expand_kp ) &
-!        CALL errore ('pw2qmcpack','expand_kp not implemented with nspin>1`', 1)     
+!        CALL errore ('pw2qmcpack','expand_kp not implemented with nspin>1`', 1)
      nbndup = nbnd
      nbnddown = nbnd
      nk = nks/2
@@ -290,8 +290,8 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
      nktot = nkstot
      !     nspin = 1
   ENDIF
-  
-! !    sanity check for lsda logic to follow 
+
+! !    sanity check for lsda logic to follow
 !   if (ionode) then
 !     DO ik = 1, nktot
 !       iks=ik+nktot
@@ -301,12 +301,12 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
 !       endif
 !     ENDDO
 !   endif
-   
-   
+
+
   !
-  
-  ! for now, I'm assuming that symmetry rotations do not affect npw, 
-  ! meaning that rotations don't displace elements outside the cutoff 
+
+  ! for now, I'm assuming that symmetry rotations do not affect npw,
+  ! meaning that rotations don't displace elements outside the cutoff
   nr1s = dffts%nr1
   nr2s = dffts%nr2
   nr3s = dffts%nr3
@@ -316,27 +316,27 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   if (ionode) then
     if(expand_kp) then
       max_sym = min(48, 2 * nsym)
-      max_nk = nktot * max_sym 
+      max_nk = nktot * max_sym
       ALLOCATE(num_irrep(nktot),xkfull_index(nktot,max_sym),sym_list(max_nk))
       ALLOCATE(xk_full_list(3,max_nk))
       ALLOCATE(rir(nxxs))
-      call generate_symmetry_equivalent_list() 
+      call generate_symmetry_equivalent_list()
       if(ionode) print *,'Total number of k-points after expansion:',nkfull
     else
       ALLOCATE(num_irrep(nktot),xkfull_index(nktot,1),sym_list(nktot))
       ALLOCATE(xk_full_list(3,nktot))
       nkfull = nktot
       do ik = 1, nktot
-        xk_full_list(:,ik) = xk(:,ik) 
+        xk_full_list(:,ik) = xk(:,ik)
         num_irrep(ik) = 1
-        sym_list(ik) = 1 
-        xkfull_index(ik,1) = ik  
-      enddo 
+        sym_list(ik) = 1
+        xkfull_index(ik,1) = ik
+      enddo
     endif
   else
     if(expand_kp) then
       max_sym = min(48, 2 * nsym)
-      max_nk = nktot * max_sym 
+      max_nk = nktot * max_sym
       ALLOCATE(num_irrep(nktot),xkfull_index(nktot,max_sym),sym_list(max_nk))
       ALLOCATE(xk_full_list(3,max_nk))
       ALLOCATE(rir(nxxs))
@@ -347,16 +347,16 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
     endif
   endif
 
-  CALL mp_bcast(xkfull_index, ionode_id, world_comm ) 
-  CALL mp_bcast(xk_full_list, ionode_id, world_comm ) 
-  CALL mp_bcast(sym_list, ionode_id, world_comm ) 
-  CALL mp_bcast(num_irrep, ionode_id, world_comm ) 
-  CALL mp_bcast(nkfull, ionode_id, world_comm ) 
-  
+  CALL mp_bcast(xkfull_index, ionode_id, world_comm )
+  CALL mp_bcast(xk_full_list, ionode_id, world_comm )
+  CALL mp_bcast(sym_list, ionode_id, world_comm )
+  CALL mp_bcast(num_irrep, ionode_id, world_comm )
+  CALL mp_bcast(nkfull, ionode_id, world_comm )
+
   ! IF ( nbase > 0 ) THEN
   !    num_irrep(1:nks) = num_irrep(nbase+1:nbase+nks)
   !    xk_full_list(:,1:nks) = xk_full_list(:,nbase+1:nbase+nks)
-  ! END IF  
+  ! END IF
 
   DO ik = 1, nks
      basekindex = ik + nbase
@@ -365,7 +365,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
      DO ig =1, npw
         ! mapping to the global g vectors.
         igk_g = ig_l2g(igk_k(ig,ik))
-        IF( igk_g > 4*npwx_tot ) & 
+        IF( igk_g > 4*npwx_tot ) &
              CALL errore ('pw2qmcpack','increase allocation of index', ig)
         indx( igk_g ) = 1
      ENDDO
@@ -423,12 +423,12 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   write(tmp_buf3,*) nr3s
   eigname = "eigenstates_"//trim(tmp_buf1)//'_'//trim(tmp_buf2)//'_'//trim(tmp_buf3)
 
-  tmp = TRIM( tmp_dir )//TRIM( h5name ) 
+  tmp = TRIM( tmp_dir )//TRIM( h5name )
   h5len = LEN_TRIM(tmp)
-  
+
 #if defined(__HDF5) || defined(__HDF5_C)
   ! writing to xml and hdf5
-  ! open hdf5 file 
+  ! open hdf5 file
   oldh5=0
   if(pool_ionode) CALL esh5_open_file(tmp,h5len,oldh5)
 
@@ -458,7 +458,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
       CALL xml_AddNewline(xmlfile)
       CALL esh5_write_supercell(lattice_real)
       CALL xml_EndElement(xmlfile, "parameter")
-      
+
       CALL xml_NewElement(xmlfile, "parameter")
       CALL xml_AddAttribute(xmlfile, "name", "reciprocal")
       CALL xml_AddAttribute(xmlfile, "units", "2pi/bohr")
@@ -490,9 +490,9 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
     CALL xml_NewElement(xmlfile, "particleset")
     CALL xml_AddAttribute(xmlfile, "name", "ion0")
     CALL xml_AddAttribute(xmlfile, "size", nat)
-    
+
     CALL esh5_open_atoms(nat,ntyp)
-    
+
     ! ionic species --> group
     DO na=1,ntyp
 
@@ -558,7 +558,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
 
     CALL esh5_close_atoms()
     ! </particleset>
-    
+
     ! <particleset name="e">
     CALL xml_NewElement(xmlfile, "particleset")
     CALL xml_AddAttribute(xmlfile, "name", "e")
@@ -589,7 +589,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
     CALL xml_EndElement(xmlfile, "particleset")
   CALL xml_EndElement(xmlfile, "qmcsystem")
   CALL xml_Close(xmlfile)
-  
+
 ! **********************************************************************
 
   !!DO ik = 0, nk-1
@@ -618,7 +618,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
       CALL xml_AddAttribute(xmlfile,"twistnum","0")
       CALL xml_AddAttribute(xmlfile,"source","ion0")
       CALL xml_AddAttribute(xmlfile,"version","0.10")
-  
+
         CALL xml_NewElement(xmlfile, "slaterdeterminant")
              ! build determinant for up electrons
           CALL xml_NewElement(xmlfile, "determinant")
@@ -645,7 +645,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
           CALL xml_EndElement(xmlfile, "determinant")
         CALL xml_EndElement(xmlfile, "slaterdeterminant")
       CALL xml_EndElement(xmlfile, "determinantset")
-  
+
 
        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
        ! two-body jastrow
@@ -717,7 +717,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
     CALL xml_EndElement(xmlfile, "wavefunction")
   CALL xml_EndElement(xmlfile, "qmcsystem")
   CALL xml_Close(xmlfile)
-     
+
   !ENDDO
 
   endif ! ionode
@@ -780,12 +780,12 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
       END IF
     END DO
   endif
-  
-  CALL mp_bcast(save_complex, ionode_id, world_comm )
-  
 
-  
-!     WRITE(io,'(A10,3(1x,i6))') 'ngrid: ',n_rgrid(1:3) 
+  CALL mp_bcast(save_complex, ionode_id, world_comm )
+
+
+
+!     WRITE(io,'(A10,3(1x,i6))') 'ngrid: ',n_rgrid(1:3)
 
   !CALL esh5_open_electrons(nup, ndown,nspin,nk,nbnd,n_rgrid)!, save_complex)
   !CALL esh5_open_electrons(nup, ndown, nspin, nkfull, nbnd, n_rgrid)!, save_complex)
@@ -797,7 +797,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
       CALL esh5_open_electrons(nup, ndown, nspin, nkfull, nbnd, n_rgrid)!, save_complex)
     endif
   endif
-  
+
 !   IF (write_psir) THEN
 !     CALL esh5_write_psi_r_mesh(n_rgrid)
 !   ENDIF
@@ -819,11 +819,11 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
         ispin = 2
 	basekindex = basekindex - nktot
       endif
-      DO iks = 1,num_irrep(basekindex)  
+      DO iks = 1,num_irrep(basekindex)
 	jks = xkfull_index(basekindex,iks)
 	g_red(1)=at(1,1)*xk_full_list(1,jks)+at(2,1)*xk_full_list(2,jks)+at(3,1)*xk_full_list(3,jks)
 	g_red(2)=at(1,2)*xk_full_list(1,jks)+at(2,2)*xk_full_list(2,jks)+at(3,2)*xk_full_list(3,jks)
-	g_red(3)=at(1,3)*xk_full_list(1,jks)+at(2,3)*xk_full_list(2,jks)+at(3,3)*xk_full_list(3,jks)        
+	g_red(3)=at(1,3)*xk_full_list(1,jks)+at(2,3)*xk_full_list(2,jks)+at(3,3)*xk_full_list(3,jks)
 	
         CALL esh5_open_kpoint(jks)
         CALL esh5_write_kpoint_data(g_red,wk(basekindex)/num_irrep(basekindex),ngtot,iks,num_irrep(basekindex))
@@ -859,13 +859,13 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
       else
 	ispin=1
       endif
-      DO iks = 1,num_irrep(basekindex)  
+      DO iks = 1,num_irrep(basekindex)
 	jks = xkfull_index(basekindex,iks)
 	g_red(1)=at(1,1)*xk_full_list(1,jks)+at(2,1)*xk_full_list(2,jks)+at(3,1)*xk_full_list(3,jks)
 	g_red(2)=at(1,2)*xk_full_list(1,jks)+at(2,2)*xk_full_list(2,jks)+at(3,2)*xk_full_list(3,jks)
 	g_red(3)=at(1,3)*xk_full_list(1,jks)+at(2,3)*xk_full_list(2,jks)+at(3,3)*xk_full_list(3,jks)
 
-	!! open kpoint 
+	!! open kpoint
 	if(pool_ionode) CALL esh5_open_kpoint(jks)
 ! 	CALL esh5_write_kpoint_data(g_red,wk(ik)/num_irrep(basekindex),ngtot)
 ! 	if (lsda) then
@@ -875,11 +875,11 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
 ! 	endif
 	if(pool_ionode) CALL esh5_open_spin(ispin)
 	if(pool_ionode) CALL esh5_close_spin()
-      
+
 	if(pool_ionode) CALL esh5_close_kpoint()
 
       ENDDO
-    ENDDO  
+    ENDDO
   endif
 
 100 FORMAT (3(1x,f20.15))
@@ -894,7 +894,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
   ! open real-space wavefunction on FFT grid
   !!CALL esh5_open_eigr(nr1s,nr2s,nr3s)
   !DO ik = 1, nk
-  
+
   CALL start_clock ( 'big_loop' )
   if(nks .eq. 1) then ! treat 1 kpoint specially
     if(pool_ionode) write(*,"(A,I8,A)") '     k pool ', my_pool_id, ' has only 1 Kpoint. Bypass everything '
@@ -924,7 +924,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
       ENDIF
     enddo
     if(pool_ionode) CALL esh5_close_spin()
-    if(pool_ionode) CALL esh5_close_kpoint() 
+    if(pool_ionode) CALL esh5_close_kpoint()
   else ! nk .neq. 1
     DO ik = 1, nks
     basekindex = ik + nbase
@@ -934,7 +934,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
     else
       ispin=1
     endif
-    DO iks = 1,num_irrep(basekindex)  
+    DO iks = 1,num_irrep(basekindex)
      jks = xkfull_index(basekindex,iks)
      isym = sym_list(jks)
 
@@ -946,7 +946,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
 
 !      if(ionode) print *,'PW2QMCPACK ik,iks=',ik,iks
 
-!      DO ispin = 1, nspin 
+!      DO ispin = 1, nspin
 !         ikk = ik + nk*(ispin-1)
 !       if (lsda) then
 !         ispin = isk(ik)
@@ -956,28 +956,28 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
 
         !!! MAM: This could be outside the num_irrep group is ispin = 1,
         !!!      can I switch the order of esh5_open_spin and
-        !!!      esh5_open_kpoint??? 
+        !!!      esh5_open_kpoint???
         CALL gk_sort (xk (1:3, ik), ngm, g, ecutwfc / tpiba2, npw, igk_k(:,ik), g2kin)
         CALL davcio (evc, 2*nwordwfc, iunwfc, ik, - 1)
         CALL gk_sort (xk_full_list (1:3, jks), ngm, g, ecutwfc / tpiba2, npw_sym, igk_sym, g2kin_sym)
         if(npw .ne. npw_sym )  then
           write(*,*) 'Warning!!!: npw != npw_sym: ',npw,npw_sym
-        endif 
+        endif
 
         if(pool_ionode) CALL esh5_open_spin(ispin)
 
         DO ibnd = 1, nbnd !!transform G to R
 
-! I should be able to do the rotation directly in G space, 
+! I should be able to do the rotation directly in G space,
 ! but for now I'm doing it like this
            IF(expand_kp) then
              psic(:)=(0.d0,0.d0)
              psitr(:)=(0.d0,0.d0)
-             tmp_evc(:) = (0.d0,0.d0) 
+             tmp_evc(:) = (0.d0,0.d0)
              IF(nproc_pool > 1) THEN
-               ! 
+               !
                psic(dffts%nl(ig_l2g(igk_k(1:npw,ik))))=evc(1:npw,ibnd)
-               
+
 !                call errore ('pw2qmcpack','parallel version not fully implemented.',2)
                if(gamma_only) then
                       call errore ('pw2qmcpack','problems with gamma_only, not fully implemented.',2)
@@ -992,14 +992,14 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
                call scatter_grid(dffts,tmp_psic,psic)
                !
                ! at this point, I have the rotated orbital in real space, might
-               ! want to keep it stored somewhere for later use if write_psir 
-               ! 
+               ! want to keep it stored somewhere for later use if write_psir
+               !
                CALL fwfft ('Wave', psic, dffts)
                !
                tmp_evc(1:npw_sym)=psic(dffts%nl(ig_l2g(igk_sym(1:npw_sym))))
-               ! 
+               !
              ELSE ! nproc_pool <= 1
-               ! 
+               !
                psic(dffts%nl(ig_l2g(igk_k(1:npw,ik))))=evc(1:npw,ibnd)
                if(gamma_only) then
                       call errore ('pw2qmcpack','problems with gamma_only, not fully implemented.',2)
@@ -1010,16 +1010,16 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
                psitr(1:nxxs) = psic(rir(1:nxxs))
                ! temporary hack to see if I have problems with inversion
                ! symmetry
-               if(isym.lt.0 .AND. iks.gt.1 .AND. abs(isym).eq.abs(sym_list(xkfull_index(basekindex,iks-1)))   ) then  
-                 psitr(1:nxxs) = CONJG(psitr(1:nxxs)) 
+               if(isym.lt.0 .AND. iks.gt.1 .AND. abs(isym).eq.abs(sym_list(xkfull_index(basekindex,iks-1)))   ) then
+                 psitr(1:nxxs) = CONJG(psitr(1:nxxs))
                endif
                !psitr(:) = psic(:)
                !
                CALL fwfft ('Wave', psitr, dffts)
                !
                tmp_evc(1:npw_sym)=psitr(dffts%nl(ig_l2g(igk_sym(1:npw_sym))))
-               ! 
-             ENDIF ! nprocpool 
+               !
+             ENDIF ! nprocpool
 
              !mapping is different with expand_kp, revert to the slow method
              DO ig=1, ngtot
@@ -1031,7 +1031,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
                DO ig7 = 1, npw_sym
                  IF( ig_l2g(igk_sym(ig7)) == igtog(ig) )THEN
                    !!! FIX FIX FIX, In parallel, this is completely incorrect since each proc only
-                   !has limited data, you have to do a sum reduce at the very end to the head node 
+                   !has limited data, you have to do a sum reduce at the very end to the head node
                    eigpacked(ig)=tmp_evc(ig7)
                    found = .TRUE.
                    GOTO 18
@@ -1063,16 +1063,16 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, debug)
               CALL invfft ('Wave', psic, dffts)
               !
               IF(nproc_pool > 1) THEN
-                ! 
+                !
                 tmp_psic=psic
 !                call cgather_smooth(psic,tmp_psic)
                 call gather_grid(dffts,psic,tmp_psic)
                 psiCptr => tmp_psic
-                ! 
+                !
               ELSE
-                ! 
+                !
                 psiCptr => psic
-                ! 
+                !
               ENDIF
               !
               IF(save_complex .eq. 1) THEN
@@ -1127,8 +1127,8 @@ CALL stop_clock( 'big_loop' )
        CALL esh5_write_density_g(ispin,den_g_global(1,ispin))
     ENDDO
     CALL esh5_close_density()
-  endif 
-   
+  endif
+
   if(pool_ionode) CALL esh5_close_electrons()
   if(pool_ionode) CALL esh5_close_file()
 
@@ -1168,7 +1168,7 @@ CALL stop_clock( 'big_loop' )
   CONTAINS
 
   SUBROUTINE generate_symmetry_equivalent_list()
-  ! 
+  !
   ! Code taken mostly from PW/exx.f90
   !
   !------------------------------------------------------------------------
@@ -1200,17 +1200,17 @@ CALL stop_clock( 'big_loop' )
   !
   ! find all k-points equivalent by symmetry to the points in the k-list
   !
-   
+
   if(lsda)then
     nktot=nkstot/2
   else
     nktot=nkstot
   endif
-  
+
   nkfull = 0
   do ik =1, nktot
     !
-    num_irrep(ik) = 0 
+    num_irrep(ik) = 0
     !
     ! isym=1 is the identity
     do is=1,nsym
@@ -1220,7 +1220,7 @@ CALL stop_clock( 'big_loop' )
                  s(:,3,is)*xk_cryst(3)
         ! add sxk to the auxiliary list if it is not already present
         xk_not_found = .true.
-        do ikq=1, nkfull 
+        do ikq=1, nkfull
            if (xk_not_found ) then
               dxk(:) = sxk(:)-xk_full_list(:,ikq) - nint(sxk(:)-xk_full_list(:,ikq))
               if ( abs(dxk(1)).le.eps .and. &
@@ -1233,12 +1233,12 @@ CALL stop_clock( 'big_loop' )
            num_irrep(ik) = num_irrep(ik) + 1
            xkfull_index(ik,num_irrep(ik)) = nkfull
            xk_full_list(:,nkfull) = sxk(:)
-           sym_list(nkfull) = is  
+           sym_list(nkfull) = is
         end if
 
         sxk(:) = - sxk(:)
         xk_not_found = .true.
-        do ikq=1, nkfull 
+        do ikq=1, nkfull
            if (xk_not_found ) then
               dxk(:) = sxk(:)-xk_full_list(:,ikq) - nint(sxk(:)-xk_full_list(:,ikq))
               if ( abs(dxk(1)).le.eps .and. &
@@ -1269,14 +1269,14 @@ CALL stop_clock( 'big_loop' )
 !     print *,'Symmetry Inequivalent list of k-points:'
 !     print *,'Total number: ',nkstot
 !     do ik =1, nkstot
-!       WRITE(*,'(i6,3(1x,f20.15))') ik, xk(1:3,ik) 
+!       WRITE(*,'(i6,3(1x,f20.15))') ik, xk(1:3,ik)
 !     enddo
 !     print *,'Full list of k-points (crystal):'
 !     print *,'Total number of k-points: ',nkfull
 !     print *,'IRREP, N, SYM-ID, KP: '
 !     do ik =1, nkstot
 !       do ns=1,num_irrep(ik)
-!         WRITE(*,'(i6,i6,i6,3(1x,f20.15))') ik,ns,sym_list(xkfull_index(ik,ns)) & 
+!         WRITE(*,'(i6,i6,i6,3(1x,f20.15))') ik,ns,sym_list(xkfull_index(ik,ns)) &
 !          ,xk_full_list(1:3,xkfull_index(ik,ns))
 !       enddo
 !     enddo
@@ -1296,9 +1296,9 @@ CALL stop_clock( 'big_loop' )
 !     end if
 !   end do
 
-  END SUBROUTINE generate_symmetry_equivalent_list 
+  END SUBROUTINE generate_symmetry_equivalent_list
   !
-  SUBROUTINE generate_symmetry_rotation(is0) 
+  SUBROUTINE generate_symmetry_rotation(is0)
   USE kinds, ONLY: DP
   USE klist,      ONLY : xk
   USE io_global,  ONLY : stdout, ionode
@@ -1336,6 +1336,6 @@ CALL stop_clock( 'big_loop' )
    end do
   end do
   !
-  END SUBROUTINE generate_symmetry_rotation 
+  END SUBROUTINE generate_symmetry_rotation
   !
 END SUBROUTINE compute_qmcpack
