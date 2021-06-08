@@ -19,7 +19,7 @@ SUBROUTINE lr_readin
   USE io_files,            ONLY : tmp_dir, prefix, wfc_dir, create_directory
   USE lsda_mod,            ONLY : current_spin, nspin, isk, lsda
   USE control_flags,       ONLY : use_para_diag, tqr, gamma_only,&
-                                  & do_makov_payne
+                                  & do_makov_payne, noinv
   USE scf,                 ONLY : vltot, v, vrs, vnew, &
                                   & destroy_scf_type, rho
   USE fft_base,            ONLY : dfftp, dffts
@@ -34,7 +34,7 @@ SUBROUTINE lr_readin
   USE check_stop,          ONLY : max_seconds
   USE realus,              ONLY : real_space, init_realspace_vars, generate_qpointlist, &
                                   betapointlist
-  USE funct,               ONLY : dft_is_meta
+  USE xc_lib,              ONLY : xclib_dft_is
   USE charg_resp,          ONLY : w_T_prefix, omeg, w_T_npol, epsil
   USE mp,                  ONLY : mp_bcast
   USE mp_global,           ONLY : my_pool_id, intra_image_comm, &
@@ -50,7 +50,7 @@ SUBROUTINE lr_readin
   USE io_rho_xml,          ONLY : write_scf
   USE mp_bands,            ONLY : ntask_groups
   USE constants,           ONLY : eps4, rytoev
-  USE control_lr,          ONLY : lrpa, alpha_mix
+  USE control_lr,          ONLY : lrpa, alpha_mix, ethr_nscf
   USE mp_world,            ONLY : world_comm
 
   IMPLICIT NONE
@@ -64,7 +64,6 @@ SUBROUTINE lr_readin
   ! Specify the amount of I/O activities
   CHARACTER(LEN=6) :: int_to_char
   INTEGER :: ios, iunout, ierr, ipol
-  LOGICAL, EXTERNAL  :: check_para_diag
   !
   CHARACTER(LEN=80)          :: card
   INTEGER :: i
@@ -75,7 +74,9 @@ SUBROUTINE lr_readin
                         & charge_response, no_hxc, n_ipol, project,      &
                         & scissor, pseudo_hermitian, d0psi_rs, lshift_d0psi, &
                         & q1, q2, q3, approximation, calculator, alpha_mix, start, &
-                        & end, increment, epsil, units 
+                        & end, increment, epsil, units, ethr_nscf, force_real_gamma, &
+                        & force_real_alpha, force_zero_alpha, &
+                        & b_pol, lan_precondition 
   NAMELIST / lr_post /    omeg, beta_gamma_z_prefix, w_T_npol, plot_type, epsil, itermax_int,sum_rule
   namelist / lr_dav /     num_eign, num_init, num_basis_max, residue_conv_thr, precondition,         &
                         & dav_debug, reference,single_pole, sort_contr, diag_of_h, close_pre,        &
@@ -119,6 +120,7 @@ SUBROUTINE lr_readin
      project = .FALSE.
      max_seconds = 1.0E+7_DP
      scissor = 0.d0
+     ethr_nscf = 1.D-11
      !
      ! For EELS
      !
@@ -138,6 +140,14 @@ SUBROUTINE lr_readin
      end = 2.5D0
      epsil = 0.02D0
      increment = 0.001D0
+     !
+     ! For Magnons
+     !
+     force_real_gamma = .FALSE.
+     force_real_alpha = .FALSE.
+     force_zero_alpha = .FALSE.
+     b_pol = 1
+     lan_precondition = .FALSE.
      !
      ! For lr_dav (Davidson program)
      !
@@ -193,7 +203,7 @@ SUBROUTINE lr_readin
      !
      !   Reading the namelist lr_post (only for optical case)
      !
-     IF (charge_response == 1 .AND. .NOT.eels) THEN
+     IF (charge_response == 1 .AND. .NOT.eels .AND. .NOT. magnons) THEN
         !
         READ (5, lr_post, err = 203, iostat = ios)
 203     CALL errore ('lr_readin', 'reading lr_post namelist', ABS (ios) )
@@ -220,7 +230,7 @@ SUBROUTINE lr_readin
      !   wfc_dir = trimcheck ( wfcdir )
      !ENDIF
      !
-     IF (.NOT.eels) THEN
+     IF (.NOT.eels .AND. .NOT. magnons) THEN
         w_T_prefix = TRIM( tmp_dir ) // &
                    & TRIM( beta_gamma_z_prefix ) // ".beta_gamma_z."
      ENDIF
@@ -240,6 +250,20 @@ SUBROUTINE lr_readin
            ipol = 1
         ENDIF
         LR_polarization = 1
+        !
+     ELSEIF (magnons .and. (b_pol ==0) ) THEN
+        !
+        n_ipol = 3
+        LR_polarization = 1
+        !
+     ELSEIF (magnons .and. ( (b_pol==1) .or. (b_pol==2) .or. (b_pol==3))) THEN
+        !
+        n_ipol = 1
+        LR_polarization = b_pol
+        !
+     ELSEIF (magnons .and. ((b_pol>3).or.(b_pol<0))) THEN
+        !
+        CALL errore( 'lr_readin', 'b_pol must be 0, 1, 2 or 3',1)
         !
      ELSE
         !
@@ -315,6 +339,20 @@ SUBROUTINE lr_readin
         !
      ENDIF
      !
+     IF (magnons) THEN
+        !
+        ! We do this trick because xq is used in LR_Modules/dv_of_drho.f90
+        ! in the Hartree term ~1/|xq+k|^2
+        !
+        xq(1) = q1
+        xq(2) = q2
+        xq(3) = q3
+        !
+        IF ( (q1.lt.eps4) .AND. (q2.lt.eps4) .AND. (q3.lt.eps4) ) &
+           CALL errore( 'lr_readin', 'The transferred momentum |q| is too small, the limit is not implemented.', 1 )
+        !
+     ENDIF
+     !
 #if defined(__MPI)
   ENDIF
   !
@@ -368,6 +406,11 @@ SUBROUTINE lr_readin
      tmp_dir_lr = TRIM (tmp_dir) // 'tmp_eels/'
      CALL create_directory(tmp_dir_lr)
   ENDIF
+  ! same for magnons
+  IF (magnons) THEN
+     tmp_dir_lr = TRIM (tmp_dir) // 'tmp_magnons/'
+     CALL create_directory(tmp_dir_lr)
+  ENDIF
   !
   ! Now PWSCF XML file will be read, and various initialisations will be done.
   ! Allocate space for PW scf variables, read and check them.
@@ -379,7 +422,7 @@ SUBROUTINE lr_readin
   !
   CALL read_file()
   !
-  IF (.NOT.eels .AND. (tqr .OR. real_space)) &
+  IF (.NOT.eels .AND. .NOT. magnons .AND. (tqr .OR. real_space)) &
      WRITE(stdout,'(/5x,"Status of real space flags: TQR=", L5 , &
                       & "  REAL_SPACE=", L5)') tqr, real_space
   !
@@ -389,7 +432,7 @@ SUBROUTINE lr_readin
   !
   wfc_dir = trimcheck ( wfcdir )
   !
-  IF (eels) THEN
+  IF (eels .OR. magnons) THEN
      !
      ! Specify the temporary directory.
      !
@@ -448,13 +491,13 @@ SUBROUTINE lr_readin
   ! (Should this not be a call to weights() to make this
   ! less insulator specific?)
   !
-  IF (.NOT.eels) CALL iweights( nks, wk, nbnd, nelec, et, ef, wg, 0, isk)
+  IF (.NOT.eels .AND. .NOT. magnons) CALL iweights( nks, wk, nbnd, nelec, et, ef, wg, 0, isk)
   !
-  IF ( charge_response == 2 .AND. .NOT.eels) CALL lr_set_boxes_density()
+  IF ( charge_response == 2 .AND. .NOT.eels .AND. .NOT. magnons) CALL lr_set_boxes_density()
   !
   ! Scalapack related stuff.
   !
-  use_para_diag = check_para_diag( nbnd )
+  CALL set_para_diag( nbnd, use_para_diag )
   !
   RETURN
   !
@@ -470,14 +513,14 @@ CONTAINS
     !
     USE paw_variables,    ONLY : okpaw
     USE uspp,             ONLY : okvan
-    USE funct,            ONLY : dft_is_hybrid
+    USE xc_lib,           ONLY : xclib_dft_is
     USE ldaU,             ONLY : lda_plus_u
 
     IMPLICIT NONE
     !
     !  Charge response mode 1 is the "do Lanczos chains twice, conserve memory" scheme.
     !
-    IF (.NOT.eels) THEN
+    IF (.NOT.eels .AND. .NOT. magnons) THEN
        !
        IF (charge_response == 1 .AND. ( omeg == 0.D0 .AND. sum_rule == -99 ) ) &
            & CALL errore ('lr_readin', &
@@ -496,7 +539,7 @@ CONTAINS
     !
     !  Meta-DFT currently not supported by TDDFPT
     !
-    IF (dft_is_meta()) CALL errore( 'lr_readin', 'Meta DFT is not implemented yet', 1 )
+    IF (xclib_dft_is('meta')) CALL errore( 'lr_readin', 'Meta DFT is not implemented yet', 1 )
     !
     ! Hubbard U is not supported
     !
@@ -509,7 +552,7 @@ CONTAINS
     !
     ! Some limitations of turboTDDFT (and not of turboEELS).
     !
-    IF (.NOT. eels) THEN
+    IF (.NOT. eels .and. .NOT. magnons) THEN
        !
        !  Non-insulating systems currently not supported by turboTDDFPT, but
        !  supported by turboEELS.
@@ -529,7 +572,7 @@ CONTAINS
     !
     ! No taskgroups and EXX.
     !
-    IF (dffts%has_task_groups .AND. dft_is_hybrid()) &
+    IF (dffts%has_task_groups .AND. xclib_dft_is('hybrid')) &
          & CALL errore( 'lr_readin', ' Linear response calculation ' // &
          & 'not implemented for EXX+Task groups', 1 )
     !
@@ -549,7 +592,7 @@ CONTAINS
     !
     ! No USPP+EXX support.
     !
-    IF (okvan .AND. dft_is_hybrid()) &
+    IF (okvan .AND. xclib_dft_is('hybrid')) &
          & CALL errore( 'lr_readin', ' Linear response calculation ' // &
          & 'not implemented for EXX+Ultrasoft', 1 )
     !
@@ -559,7 +602,7 @@ CONTAINS
     IF (lsda) CALL errore( 'lr_readin', 'LSDA is not implemented', 1 )
     !
     IF (real_space)  THEN
-       IF (eels) THEN
+       IF (eels .OR. magnons) THEN
           CALL errore( 'lr_readin', 'Option real_space=.true. is not implemented', 1 )
        ELSE
           CALL errore( 'lr_readin', 'Option real_space=.true. is not tested', 1 )
@@ -568,7 +611,7 @@ CONTAINS
     !
     ! EELS-related restrictions
     !
-    IF (eels) THEN
+    IF (eels .OR. magnons) THEN
        !
        IF (gamma_only)  CALL errore( 'lr_readin', 'gamma_only is not supported', 1 )
        !
@@ -580,7 +623,7 @@ CONTAINS
        IF (project)     CALL errore( 'lr_readin', 'project is not allowed', 1 )
        IF (tqr)         CALL errore( 'lr_readin', 'tqr is not supported', 1 )
        IF (charge_response /= 0) CALL errore( 'lr_readin', 'charge_response /= 0 is not allowed', 1 )
-       IF (dft_is_hybrid())    CALL errore( 'lr_readin', 'EXX is not supported', 1 )
+       IF (xclib_dft_is('hybrid'))    CALL errore( 'lr_readin', 'EXX is not supported', 1 )
        IF (do_comp_mt)  CALL errore( 'lr_readin', 'Martyna-Tuckerman PBC is not supported.', 1 )
        IF (d0psi_rs)    CALL errore( 'lr_readin', 'd0psi_rs is not allowed', 1 )
        !
@@ -590,6 +633,15 @@ CONTAINS
        !
        CALL plugin_check('lr_readin')
        !
+    ENDIF
+    !
+    ! MAgnons restrictions
+    !
+    IF ( magnons ) THEN
+       IF ( (.not. noinv) .or. (.not. nosym)) THEN
+          call errore('iosys', 'Magnons linear response calculation' // &
+                     & 'is not implemented with symmetry', 1 )
+       ENDIF
     ENDIF
     !
     RETURN
