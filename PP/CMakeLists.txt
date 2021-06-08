@@ -529,6 +529,7 @@ qe_install_targets(
     qe_pp_fermisurface_exe
     qe_pp_fermiproj_exe
     qe_pp_ppacf_exe
+    qe_pp_pw2qmcpack_exe
     # Simple Transport
     qe_pp_st_ef_exe
     qe_pp_st_dos_exe
