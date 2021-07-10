@@ -298,9 +298,6 @@ target_link_libraries(qe_pp_pw2gw_exe
 set(src_sumpdos_x src/sumpdos.f90)
 qe_add_executable(qe_pp_sumpdos_exe ${src_sumpdos_x})
 set_target_properties(qe_pp_sumpdos_exe PROPERTIES OUTPUT_NAME sumpdos.x)
-target_link_libraries(qe_pp_sumpdos_exe
-    PRIVATE
-        qe_pp)
 
 ###########################################################
 # epsilon.x
@@ -323,7 +320,6 @@ qe_add_executable(qe_pp_wannierham_exe ${src_wannier_ham_x})
 set_target_properties(qe_pp_wannierham_exe PROPERTIES OUTPUT_NAME wannier_ham.x)
 target_link_libraries(qe_pp_wannierham_exe
     PRIVATE
-        qe_clib
         qe_pw
         qe_modules
         qe_upflib

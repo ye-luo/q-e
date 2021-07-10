@@ -64,6 +64,7 @@ include(GNUInstallDirs)
 ###########################################################
 # Build Options
 ###########################################################
+include(CMakeDependentOption)
 option(QE_ENABLE_CUDA
     "enable CUDA acceleration on NVIDIA GPUs" OFF)
 if(QE_ENABLE_CUDA)
@@ -78,12 +79,16 @@ else()
 endif()
 option(QE_ENABLE_MPI
     "enable distributed execution support via MPI" ON)
+option(QE_ENABLE_MPI_GPU_AWARE
+    "enable GPU aware MPI operations" OFF)
 option(QE_ENABLE_TEST
     "enable unit and system tests" ON)
+cmake_dependent_option(QE_ENABLE_BENCHMARK
+    "enable benchmark tests" OFF "QE_ENABLE_TEST" OFF)
 option(QE_ENABLE_TRACE
     "enable execution tracing output" OFF)
 option(QE_ENABLE_PROFILE_NVTX
-        "enable execution of NVidia profiler plugin" OFF) 
+        "enable execution of NVIDIA NVTX profiler plugin" OFF)
 option(QE_ENABLE_MPI_INPLACE
     "enable inplace MPI calls (ignored when QE_ENABLE_MPI=OFF)" OFF)
 option(QE_ENABLE_MPI_MODULE
@@ -100,6 +105,8 @@ option(QE_ENABLE_LIBXC
     "enable LIBXC execution units" OFF)
 option(QE_ENABLE_HDF5
     "enable HDF5 data collection" ON)
+option(QE_ENABLE_STATIC_BUILD
+    "enable fully static build of executables" OFF)
 option(QE_ENABLE_DOC
     "enable documentation building" OFF)
 set(QE_FFTW_VENDOR "AUTO" CACHE 
@@ -140,6 +147,9 @@ endif()
 if(QE_ENABLE_MPI)
     # OMPI_SKIP_MPICXX: skip CXX APIs on openmpi, cause trouble to C APIs
     qe_add_global_compile_definitions(__MPI OMPI_SKIP_MPICXX)
+    if(QE_ENABLE_MPI_GPU_AWARE)
+        qe_add_global_compile_definitions(__GPU_MPI)
+    endif()
 endif()
 if(QE_ENABLE_SCALAPACK)
     qe_add_global_compile_definitions(__SCALAPACK)
@@ -155,6 +165,9 @@ if(HAVE_MALLINFO)
 endif()
 
 # Check options consistency
+if(QE_ENABLE_STATIC_BUILD AND BUILD_SHARED_LIBS)
+    message(FATAL_ERROR "Full static build of QE executables requires static QE internal libraries. QE_ENABLE_STATIC_BUILD and BUILD_SHARED_LIBS cannot be both ON")
+endif()
 if(QE_ENABLE_ELPA AND NOT QE_ENABLE_SCALAPACK)
     message(FATAL_ERROR "ELPA requires SCALAPACK support, enable it with '-DQE_ENABLE_SCALAPACK=ON' or disable ELPA with '-DQE_ENABLE_ELPA=OFF'")
 endif()
@@ -163,6 +176,9 @@ if(QE_ENABLE_SCALAPACK AND NOT QE_ENABLE_MPI)
 endif()
 if(QE_ENABLE_CUDA AND NOT (CMAKE_Fortran_COMPILER_ID MATCHES "PGI" OR CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC"))
     message(FATAL_ERROR "PGI compiler is mandatory when CUDA is enable due QE is based on CUDA Fortran language")
+endif()
+if(QE_ENABLE_MPI_GPU_AWARE AND NOT (QE_ENABLE_CUDA AND QE_ENABLE_MPI))
+    message(FATAL_ERROR "GPU aware MPI requires both MPI and CUDA features enabled")
 endif()
 if(QE_ENABLE_LAXLIB_CUSOLVER AND (NOT QE_ENABLE_CUDA))
     message(FATAL_ERROR "CUDA Solver for LAXLib requires CUDA support, enable it with '-DQE_ENABLE_CUDA=ON' or disable CUDA Solver for LAXLib with '-DQE_ENABLE_LAXLIB_CUSOLVER=OFF'")
@@ -209,19 +225,35 @@ elseif(CMAKE_Fortran_COMPILER_ID MATCHES "XL")
     include(${PROJECT_CMAKE}/IBMFortranCompiler.cmake)
 endif()
 
+if(QE_ENABLE_STATIC_BUILD)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+endif()
+
 ###########################################################
 # CUDA
 ###########################################################
 if(QE_ENABLE_CUDA OR QE_ENABLE_PROFILE_NVTX)
     if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI" OR CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC")
-      add_library(CUDA::cufft INTERFACE IMPORTED)
-      set_target_properties(CUDA::cufft PROPERTIES INTERFACE_LINK_LIBRARIES "${CUDA_FLAG}lib=cufft")
-      add_library(CUDA::cublas INTERFACE IMPORTED)
-      set_target_properties(CUDA::cublas PROPERTIES INTERFACE_LINK_LIBRARIES "${CUDA_FLAG}lib=cublas")
-      add_library(CUDA::cusolver INTERFACE IMPORTED)
-      set_target_properties(CUDA::cusolver PROPERTIES INTERFACE_LINK_LIBRARIES "${CUDA_FLAG}lib=cusolver")
+        add_library(CUDA::cufft INTERFACE IMPORTED)
+        set_target_properties(CUDA::cufft PROPERTIES INTERFACE_LINK_LIBRARIES "${CUDA_FLAG}lib=cufft")
+        add_library(CUDA::cublas INTERFACE IMPORTED)
+        set_target_properties(CUDA::cublas PROPERTIES INTERFACE_LINK_LIBRARIES "${CUDA_FLAG}lib=cublas")
+        add_library(CUDA::cusolver INTERFACE IMPORTED)
+        set_target_properties(CUDA::cusolver PROPERTIES INTERFACE_LINK_LIBRARIES "${CUDA_FLAG}lib=cusolver")
+        add_library(CUDA::curand INTERFACE IMPORTED)
+        set_target_properties(CUDA::curand PROPERTIES INTERFACE_LINK_LIBRARIES "${CUDA_FLAG}lib=curand")
+        if(QE_ENABLE_PROFILE_NVTX)
+            add_library(CUDA::nvToolsExt INTERFACE IMPORTED)
+            set_target_properties(CUDA::nvToolsExt PROPERTIES INTERFACE_LINK_LIBRARIES "-cuda;libnvToolsExt.so")
+            set(CMAKE_REQUIRED_LIBRARIES "-cuda;libnvToolsExt.so")
+            check_function_exists(nvtxRangePushEx NVTX_FOUND)
+            if(NOT NVTX_FOUND)
+                message(FATAL_ERROR "Check nvtxRangePushEx in libnvToolsExt.so failed")
+            endif()
+        endif()
     else()
-      find_package(CUDAToolkit REQUIRED)
+        find_package(CUDAToolkit REQUIRED)
     endif()
 endif(QE_ENABLE_CUDA OR QE_ENABLE_PROFILE_NVTX)
 
@@ -301,9 +333,15 @@ if(NOT QE_LAPACK_INTERNAL)
         if(NOT LAPACK_FOUND)
             message(STATUS "Trying to find alternative LAPACK libraries")
             SET(BLA_VENDOR All)
+            if(QE_ENABLE_OPENMP)
+                set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_Fortran_FLAGS})
+            endif()
             find_package(LAPACK)
         endif()
     else()
+        if(QE_ENABLE_OPENMP)
+            set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_Fortran_FLAGS})
+        endif()
         find_package(LAPACK)
     endif()
     if(LAPACK_FOUND)
@@ -312,6 +350,9 @@ if(NOT QE_LAPACK_INTERNAL)
             ${BLAS_LINKER_FLAGS}
             ${LAPACK_LIBRARIES}
             ${LAPACK_LINKER_FLAGS})
+        if(QE_ENABLE_OPENMP)
+            list(APPEND _lapack_libs ${OpenMP_Fortran_LIBRARIES})
+        endif()
         list(REMOVE_DUPLICATES "${_lapack_libs}")
         message(STATUS "Found LAPACK: ${_lapack_libs}")
         target_link_libraries(qe_lapack INTERFACE ${_lapack_libs})
@@ -367,36 +408,28 @@ if(QE_ENABLE_ELPA)
     find_package(ELPA REQUIRED)
 
     # Check if ELPA version is compatible with QE
-    if(ELPA_VERSION_STRING VERSION_GREATER_EQUAL "2018.11")
+    if(ELPA_VERSION VERSION_GREATER_EQUAL "2018.11")
         set(QE_ELPA_DEFINITIONS __ELPA)
-    elseif(ELPA_VERSION_STRING VERSION_GREATER_EQUAL "2016.11")
+    elseif(ELPA_VERSION VERSION_GREATER_EQUAL "2016.11")
         set(QE_ELPA_DEFINITIONS __ELPA_2016)
-    elseif(ELPA_VERSION_STRING VERSION_GREATER_EQUAL "2015")
+    elseif(ELPA_VERSION VERSION_GREATER_EQUAL "2015")
         set(QE_ELPA_DEFINITIONS __ELPA_2015)
     else()
-        message(FATAL_ERROR "ELPA verion ${ELPA_VERSION_STRING} is not supported.")
+        message(FATAL_ERROR "ELPA verion ${ELPA_VERSION} is not supported.")
     endif()
     message(STATUS "Add ELPA flag : ${QE_ELPA_DEFINITIONS}")
     qe_add_global_compile_definitions(${QE_ELPA_DEFINITIONS})
-
-    # Looking for module directory
-    file(GLOB_RECURSE ELPA_MODS_FILES "${ELPA_INCLUDE_DIRS}/*.mod" "${ELPA_INCLUDE_DIRS}/../modules/*.mod")
-    if(ELPA_MODS_FILES)
-        list(GET ELPA_MODS_FILES 0 ELPA_MOD)
-        get_filename_component(ELPA_MOD_DIR "${ELPA_MOD}" PATH)
-        set(ELPA_INCLUDE_DIRS "${ELPA_MOD_DIR};${ELPA_INCLUDE_DIRS}")
-    else()
-        message(FATAL_ERROR "Fortran module directory of ELPA not found!")
-    endif()
 
     # Add link libraries and include directories
     target_link_libraries(qe_elpa
         INTERFACE
             ${ELPA_LIBRARIES}
             ${ELPA_LIBRARIES_DEP}
-            ${ELPA_LINKER_FLAGS})
+            ${ELPA_LINKER_FLAGS}
+            qe_scalapack)
     target_include_directories(qe_elpa
         INTERFACE
+            ${ELPA_Fortran_MODS_DIR}
             ${ELPA_INCLUDE_DIRS}
             ${ELPA_INCLUDE_DIRS_DEP})
 endif(QE_ENABLE_ELPA)
@@ -437,23 +470,13 @@ endif(QE_ENABLE_LIBXC)
 add_library(qe_hdf5_fortran INTERFACE)
 add_library(qe_hdf5_c INTERFACE)
 qe_install_targets(qe_hdf5_fortran qe_hdf5_c)
-###########################################################
-# PROFILERS LIBRARIES
-# the target for profiler libray will be defined if
-# some profiler is enabled
-add_library(qe_ext_prof_tool INTERFACE)
-qe_install_targets(qe_ext_prof_tool) 
-###########################################################
-# this should work with nvfortran 
-if(QE_ENABLE_PROFILE_NVTX)
-   target_link_libraries(qe_ext_prof_tool
-	INTERFACE
-        CUDA::nvToolsExt)
-endif(QE_ENABLE_PROFILE_NVTX)
 ########################################################### 
 if(QE_ENABLE_HDF5)
     if(QE_ENABLE_MPI)
         option(HDF5_PREFER_PARALLEL "Prefer parallel HDF5" ON)
+    endif()
+    if(QE_ENABLE_STATIC_BUILD)
+        set(HDF5_USE_STATIC_LIBRARIES TRUE)
     endif()
     find_package(HDF5 REQUIRED Fortran C HL)
     if(NOT HDF5_FOUND)
@@ -501,6 +524,20 @@ if(QE_ENABLE_TEST)
 endif(QE_ENABLE_TEST)
 
 ###########################################################
+# PROFILERS LIBRARIES
+# the target for profiler libray will be defined if
+# some profiler is enabled
+add_library(qe_ext_prof_tool INTERFACE)
+qe_install_targets(qe_ext_prof_tool)
+###########################################################
+# this should work with nvfortran
+if(QE_ENABLE_PROFILE_NVTX)
+   target_link_libraries(qe_ext_prof_tool
+	INTERFACE
+        CUDA::nvToolsExt)
+endif(QE_ENABLE_PROFILE_NVTX)
+
+###########################################################
 # Components
 ###########################################################
 add_subdirectory(external)
@@ -524,9 +561,7 @@ add_subdirectory(EPW)
 add_subdirectory(GWW)
 add_subdirectory(HP)
 add_subdirectory(NEB)
-add_subdirectory(PlotPhon)
 add_subdirectory(PWCOND)
-add_subdirectory(QHA)
 add_subdirectory(TDDFPT)
 add_subdirectory(XSpectra)
 add_subdirectory(QEHeat)
@@ -538,6 +573,7 @@ endif()
 # Tests
 ###########################################################
 if(QE_ENABLE_TEST)
+  message(STATUS "Enabling tests in test-suite")
   add_subdirectory(test-suite)
 endif()
 
@@ -651,7 +687,6 @@ add_custom_target(pp
         qe_pp_plotproj_exe
         qe_pp_plotrho_exe
         qe_pp_pmw_exe
-        qe_pp_xctest_exe
         qe_pp_projwfc_exe
         qe_pp_pw2wannier90_exe
         qe_pp_pw2critic_exe
