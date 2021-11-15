@@ -36,7 +36,7 @@ SUBROUTINE read_file()
   ! ... io_level = 1 so that a real file is opened
   !
   nwordwfc = nbnd*npwx*npol
-  io_level = 1
+  IF ( io_level /= 0 ) io_level = 1
   CALL open_buffer ( iunwfc, 'wfc', nwordwfc, io_level, exst )
   !
   ! ... read wavefunctions in collected format, write them to file
@@ -56,7 +56,7 @@ SUBROUTINE read_file()
           'read_file: Wavefunctions in collected format not available'
   END IF
   !
-  CALL close_buffer  ( iunwfc, 'KEEP' )
+  IF ( io_level /= 0 ) CALL close_buffer  ( iunwfc, 'KEEP' )
   !
 END SUBROUTINE read_file
 !
@@ -75,7 +75,7 @@ SUBROUTINE read_file_new ( needwf )
   USE gvecw,          ONLY : gcutw
   USE klist,          ONLY : nkstot, nks, xk, wk
   USE lsda_mod,       ONLY : isk, nspin
-  USE spin_orb,       ONLY : domag
+  USE noncollin_module,ONLY: domag
   USE wvfct,          ONLY : nbnd, et, wg
   USE pw_restart_new, ONLY : read_xml_file
   USE xc_lib,         ONLY : xclib_dft_is_libxc, xclib_init_libxc
@@ -222,6 +222,8 @@ SUBROUTINE post_xml_init (  )
   g_d    = g
   gg_d   = gg
 #endif
+  !$acc update device(mill, g)
+  !
   CALL ggens( dffts, gamma_only, at, g, gg, mill, gcutms, ngms ) 
   CALL gshells ( lmovecell ) 
   !
