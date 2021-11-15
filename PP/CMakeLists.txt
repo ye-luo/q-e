@@ -434,7 +434,7 @@ target_link_libraries(qe_pp_pw2qmcpack_exe
         qe_fftx
         qe_upflib
         qe_xclib
-        qe_clib_esh5)
+        qe_utilx_esh5)
 
 ###########################################################
 # ef.x
