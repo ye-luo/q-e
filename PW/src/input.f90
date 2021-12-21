@@ -56,7 +56,13 @@ SUBROUTINE iosys()
                               dt_         => dt, &
                               delta_t_    => delta_t, &
                               nraise_     => nraise, &
-                              refold_pos_ => refold_pos
+                              refold_pos_ => refold_pos, &
+                              fire_nmin_ => fire_nmin, &
+                              fire_f_inc_ => fire_f_inc, &
+                              fire_f_dec_ => fire_f_dec,  &
+                              fire_alpha_init_ => fire_alpha_init, &  
+                              fire_falpha_ => fire_falpha, &
+                              fire_dtmax_ => fire_dtmax
   !
   USE extfield,      ONLY : tefield_  => tefield, &
                             dipfield_ => dipfield, &
@@ -185,12 +191,10 @@ SUBROUTINE iosys()
                                lambda_    => lambda, &
                                angle1_    => angle1, &
                                angle2_    => angle2, &
-                               report_    => report
-  !
-  USE spin_orb, ONLY : lspinorb_ => lspinorb,  &
-                       lforcet_ => lforcet,    &
-                       starting_spin_angle_ => starting_spin_angle
-
+                               report_    => report, &
+                               lspinorb_ => lspinorb,  &
+                               lforcet_ => lforcet,    &
+                               starting_spin_angle_ => starting_spin_angle
   !
   USE symm_base, ONLY : no_t_rev_ => no_t_rev, nofrac, allfrac, &
                         nosym_ => nosym, nosym_evc_=> nosym_evc
@@ -286,7 +290,9 @@ SUBROUTINE iosys()
                                refold_pos, remove_rigid_rot, upscale,          &
                                pot_extrapolation,  wfc_extrapolation,          &
                                w_1, w_2, trust_radius_max, trust_radius_min,   &
-                               trust_radius_ini, bfgs_ndim
+                               trust_radius_ini, bfgs_ndim, &
+                               fire_nmin, fire_f_inc, fire_f_dec, &
+                               fire_alpha_init, fire_falpha, fire_dtmax
   !
   ! ... CELL namelist
   !
@@ -388,6 +394,20 @@ SUBROUTINE iosys()
         !
         lmd     = .true.
         calc    = 'vm'
+        !
+        ntcheck = nstep + 1
+        !
+     CASE ( 'fire' )
+        !
+        lmd     = .true.
+        calc    = 'fi'
+        ! set fire variables
+        fire_nmin_ = fire_nmin
+        fire_f_inc_ = fire_f_inc
+        fire_f_dec_ = fire_f_dec
+        fire_alpha_init_ = fire_alpha_init
+        fire_falpha_ = fire_falpha
+        fire_dtmax_ = fire_dtmax
         !
         ntcheck = nstep + 1
         !
@@ -628,9 +648,9 @@ SUBROUTINE iosys()
   IF( nbnd < 1 ) CALL errore( 'iosys', 'nbnd less than 1', nbnd ) 
   nbnd_    = nbnd
   !
-  two_fermi_energies = ( tot_magnetization /= -1._DP)
-  IF ( two_fermi_energies .and. tot_magnetization < 0._DP) &
-     CALL errore( 'iosys', 'tot_magnetization only takes positive values', 1 )
+  two_fermi_energies = ( tot_magnetization /= -10000._DP)
+  IF ( two_fermi_energies .and. tot_magnetization < -9999._DP) &
+     CALL errore( 'iosys', 'tot_magnetization only larger than -9999 is allowed', 1 )
   IF ( two_fermi_energies .and. .not. lsda ) &
      CALL errore( 'iosys', 'tot_magnetization requires nspin=2', 1 )
   !
