@@ -32,3 +32,11 @@ if("d3q" IN_LIST QE_ENABLE_PLUGINS)
   qe_git_submodule_update(external/d3q)
   add_subdirectory(d3q)
 endif()
+
+###########################################################
+# PW2QMCPACK
+###########################################################
+if("pw2qmcpack" IN_LIST QE_ENABLE_PLUGINS OR QE_ENABLE_PW2QMCPACK)
+  #qe_git_submodule_update(external/pw2qmcpack)
+  add_subdirectory(pw2qmcpack)
+endif()

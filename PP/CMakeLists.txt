@@ -436,22 +436,6 @@ target_link_libraries(qe_pp_ppacf_exe
         qe_lapack)
 
 ###########################################################
-# pw2qmcpack.x
-###########################################################
-set(sources src/pw2qmcpack.f90)
-qe_add_executable(qe_pp_pw2qmcpack_exe ${sources})
-set_target_properties(qe_pp_pw2qmcpack_exe PROPERTIES OUTPUT_NAME pw2qmcpack.x)
-target_link_libraries(qe_pp_pw2qmcpack_exe
-    PRIVATE
-        qe_pw
-        qe_pp
-        qe_modules
-        qe_fftx
-        qe_upflib
-        qe_xclib
-        qe_utilx_esh5)
-
-###########################################################
 # ef.x
 ###########################################################
 set(src_ef_x 
@@ -539,7 +523,6 @@ set(PP_EXE_TARGETS
     qe_pp_fermisurface_exe
     qe_pp_fermiproj_exe
     qe_pp_ppacf_exe
-    qe_pp_pw2qmcpack_exe
     # Simple Transport
     qe_pp_st_ef_exe
     qe_pp_st_dos_exe
